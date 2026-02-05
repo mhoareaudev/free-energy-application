@@ -1,0 +1,347 @@
+.topbar {
+  height: var(--topbar-height);
+  min-height: var(--topbar-height);
+  background-color: rgb(153, 20, 20);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--spacing-lg);
+  gap: var(--spacing-lg);
+}
+
+/* Left section - Logo */
+.topbar-left {
+  flex: 0 0 auto;
+}
+
+.topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.logo-image {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+}
+
+.logo-text {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--primary-600);
+}
+
+/* Center section - Search */
+.topbar-center {
+  flex: 1;
+  max-width: 500px;
+  display: flex;
+  justify-content: center;
+}
+
+.search-form {
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: var(--spacing-md);
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  height: 34px;
+  padding: var(--spacing-xs) var(--spacing-lg);
+  padding-left: 40px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  font-size: var(--font-size-sm);
+  transition: all var(--transition-fast);
+}
+
+.search-input:focus {
+  background: var(--bg-primary);
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px var(--primary-100);
+}
+
+.search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Right section - Actions & User */
+.topbar-right {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* Save status indicator */
+.save-status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 0 var(--spacing-sm);
+  height: 32px;
+  color: white;
+  font-size: var(--font-size-xs);
+  opacity: 0.9;
+}
+
+.save-icon {
+  flex-shrink: 0;
+}
+
+.save-icon.saved {
+  color: #90EE90;
+}
+
+.save-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.save-text {
+  white-space: nowrap;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn-request-vt {
+  height: 32px;
+  padding: 0 var(--spacing-md);
+  background: white;
+  color: rgb(153, 20, 20);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.btn-request-vt:hover {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.btn-admin {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: white;
+  transition: all var(--transition-fast);
+}
+
+.btn-admin:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.settings-container,
+.user-container {
+  position: relative;
+}
+
+.btn-settings {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: white;
+  transition: all var(--transition-fast);
+}
+
+.btn-settings:hover {
+  background: rgb(209, 83, 83);
+  color: white;
+}
+
+.btn-user {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  height: 34px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.btn-user:hover {
+  background: rgb(209, 83, 83);
+}
+
+.user-avatar {
+  width: 26px;
+  height: 26px;
+  background: white;
+  color: rgb(153, 20, 20);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-name {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: white;
+}
+
+.chevron {
+  color: white;
+}
+
+.chevron.open {
+  transform: rotate(180deg);
+}
+
+/* Settings Menu */
+.settings-menu {
+  position: absolute;
+  top: calc(100% + var(--spacing-xs));
+  right: 0;
+  width: 260px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-dropdown);
+  overflow: hidden;
+}
+
+.settings-menu-header {
+  padding: var(--spacing-md);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+}
+
+.settings-menu-content {
+  padding: var(--spacing-sm);
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-md);
+}
+
+.settings-item:hover {
+  background: var(--bg-secondary);
+}
+
+.settings-item select {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
+}
+
+.settings-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary-600);
+}
+
+/* User Menu */
+.user-menu {
+  position: absolute;
+  top: calc(100% + var(--spacing-xs));
+  right: 0;
+  width: 220px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-dropdown);
+  overflow: hidden;
+}
+
+.user-menu-header {
+  padding: var(--spacing-md);
+  background: var(--bg-secondary);
+}
+
+.user-full-name {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.user-role {
+  font-size: var(--font-size-xs);
+  color: var(--primary-600);
+  margin-top: 2px;
+}
+
+.user-menu-divider {
+  height: 1px;
+  background: var(--border-light);
+}
+
+.user-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.user-menu-item:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+  .topbar {
+    padding: 0 var(--spacing-sm);
+  }
+
+  .logo-text {
+    display: none;
+  }
+
+  .topbar-center {
+    max-width: 200px;
+  }
+
+  .user-name {
+    display: none;
+  }
+
+  .btn-request-vt {
+    padding: 0 var(--spacing-sm);
+    font-size: var(--font-size-xs);
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar-center {
+    display: none;
+  }
+}

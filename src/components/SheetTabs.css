@@ -1,0 +1,119 @@
+.sheet-tabs {
+  height: var(--tabs-height);
+  min-height: var(--tabs-height);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--spacing-md);
+}
+
+.tabs-container {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  max-width: 70%;
+}
+
+.tabs-container::-webkit-scrollbar {
+  height: 0;
+}
+
+.sheet-tab {
+  height: 26px;
+  padding: 0 var(--spacing-lg);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.sheet-tab-name {
+  flex-shrink: 0;
+}
+
+.sheet-tab-users {
+  display: flex;
+  align-items: center;
+  margin-left: 2px;
+}
+
+.sheet-tab-user {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 8px;
+  font-weight: 600;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -4px;
+  border: 1px solid var(--bg-tertiary);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+.sheet-tab-user:first-child {
+  margin-left: 0;
+}
+
+.sheet-tab-user.more {
+  background: var(--gray-500);
+  font-size: 7px;
+}
+
+.sheet-tab:hover {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.sheet-tab.active {
+  background: var(--bg-primary);
+  color: var(--primary-600);
+  font-weight: 600;
+  border-color: var(--primary-200);
+  border-bottom: 1px solid var(--bg-primary);
+  position: relative;
+  top: 1px;
+}
+
+.tabs-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.sheet-info {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+  .sheet-tabs {
+    padding: 0 var(--spacing-sm);
+  }
+
+  .sheet-tab {
+    padding: 0 var(--spacing-md);
+    font-size: 10px;
+  }
+
+  .tabs-container {
+    max-width: 100%;
+  }
+
+  .tabs-actions {
+    display: none;
+  }
+}
