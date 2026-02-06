@@ -187,6 +187,70 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user();
 
+-- Notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  recipient_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  type VARCHAR(50) NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT,
+  data JSONB DEFAULT '{}',
+  read BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read their own notifications" ON notifications
+  FOR SELECT USING (auth.uid() = recipient_id);
+
+CREATE POLICY "Authenticated users can insert notifications" ON notifications
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Users can update their own notifications" ON notifications
+  FOR UPDATE USING (auth.uid() = recipient_id);
+
+CREATE POLICY "Users can delete their own notifications" ON notifications
+  FOR DELETE USING (auth.uid() = recipient_id);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_id, read, created_at DESC);
+
+-- Enable realtime on notifications table
+ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+
+-- Role visibility table (controls which column groups each role can see)
+CREATE TABLE IF NOT EXISTS role_visibility (
+  role VARCHAR(50) PRIMARY KEY CHECK (role IN ('administratif', 'technique', 'commercial')),
+  hidden_groups JSONB NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE role_visibility ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Role visibility is viewable by authenticated users" ON role_visibility
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Admins can insert role visibility" ON role_visibility
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role = 'administrateur'
+    )
+  );
+
+CREATE POLICY "Admins can update role visibility" ON role_visibility
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role = 'administrateur'
+    )
+  );
+
+CREATE TRIGGER update_role_visibility_updated_at
+  BEFORE UPDATE ON role_visibility
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
 -- Create default admin user (run this manually after creating a user in Auth)
 -- INSERT INTO profiles (id, nom, prenom, identifiant, role)
 -- VALUES ('your-user-uuid', 'Admin', 'Free Energy', 'admin@free-energy.fr', 'administrateur');

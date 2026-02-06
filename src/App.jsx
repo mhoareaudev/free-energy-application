@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { SpreadsheetProvider } from './context/SpreadsheetContext'
+import { NotificationProvider } from './context/NotificationContext'
 import TopBar from './components/TopBar'
 import StyleBar from './components/StyleBar'
 import Spreadsheet from './components/Spreadsheet'
@@ -30,6 +31,7 @@ function AppContent() {
   if (!user) return <Login />
 
   return (
+    <NotificationProvider>
     <SpreadsheetProvider>
       <div className="app">
         <TopBar
@@ -51,6 +53,7 @@ function AppContent() {
         />
       </div>
     </SpreadsheetProvider>
+    </NotificationProvider>
   )
 }
 

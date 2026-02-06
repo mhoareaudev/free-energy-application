@@ -1,13 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Supabase configuration - Replace with your actual Supabase URL and anon key
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key'
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co'
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: false, // Ne pas persister la session - connexion requise à chaque visite
-    autoRefreshToken: false,
+    autoRefreshToken: true, // Keep token fresh during active session
   },
 })
 

@@ -383,6 +383,146 @@
   margin-top: calc(-1 * var(--spacing-sm));
 }
 
+/* Toggle Switch */
+.toggle-switch {
+  width: 40px;
+  height: 22px;
+  background: #d1d5db;
+  border-radius: 11px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+  border: none;
+  padding: 0;
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.toggle-switch.active {
+  background: #10b981;
+}
+
+.toggle-switch.active::after {
+  transform: translateX(18px);
+}
+
+/* Role Sub-tabs */
+.role-subtabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.role-subtab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition-fast);
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  cursor: pointer;
+}
+
+.role-subtab:hover {
+  background: var(--bg-secondary);
+}
+
+.role-subtab.active {
+  border-bottom-color: var(--primary-600);
+  background: var(--bg-primary);
+}
+
+/* Role Sections */
+.roles-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-lg);
+}
+
+.role-badge-header {
+  display: inline-block;
+  padding: 2px var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+}
+
+.role-badge-header.administratif {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.role-badge-header.technique {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.role-badge-header.commercial {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.sheet-subsection {
+  margin-bottom: var(--spacing-md);
+  margin-left: var(--spacing-sm);
+}
+
+.sheet-subsection-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xs);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.group-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.group-toggle-row:hover {
+  background: var(--bg-secondary);
+}
+
+.group-toggle-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.group-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.group-toggle-name {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
 /* Mobile styles */
 @media (max-width: 768px) {
   .admin-panel {

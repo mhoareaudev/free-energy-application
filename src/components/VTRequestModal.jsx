@@ -3,11 +3,13 @@ import { X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useSpreadsheet } from '../context/SpreadsheetContext'
+import { useNotifications } from '../context/NotificationContext'
 import './Modal.css'
 
 export default function VTRequestModal({ isOpen, onClose }) {
   const { userProfile } = useAuth()
   const { addVTRequest } = useSpreadsheet()
+  const { notifyAllExcept } = useNotifications()
   const [commerciaux, setCommerciaux] = useState([])
   const [formData, setFormData] = useState({
     nom: '',
@@ -15,6 +17,16 @@ export default function VTRequestModal({ isOpen, onClose }) {
     commercial: '',
     typeClient: 'btoc',
     typeContrat: 'comptant',
+    puissance: '',
+    adresse: '',
+    codePostal: '',
+    commune: '',
+    email: '',
+    tel: '',
+    reventeSurplus: '',
+    contratMaintenance: '',
+    batterie: '',
+    priseSécurisée: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -79,6 +91,22 @@ export default function VTRequestModal({ isOpen, onClose }) {
         commercial: commercialName,
         clientName: clientName,
         dateDemandeVT: today,
+        vtFormData: {
+          commercial: commercialName,
+          clientName: clientName,
+          date: today,
+          typeContrat: formData.typeContrat,
+          puissance: formData.puissance,
+          adresse: formData.adresse,
+          codePostal: formData.codePostal,
+          commune: formData.commune,
+          email: formData.email,
+          tel: formData.tel,
+          reventeSurplus: formData.reventeSurplus,
+          contratMaintenance: formData.contratMaintenance,
+          batterie: formData.batterie,
+          priseSécurisée: formData.priseSécurisée,
+        },
       })
 
       // Also save to Supabase for tracking
@@ -99,6 +127,16 @@ export default function VTRequestModal({ isOpen, onClose }) {
         console.warn('Could not save to vt_requests:', insertError)
       }
 
+      // Notify all other users about the new VT request
+      const requesterName = `${userProfile?.prenom || ''} ${userProfile?.nom || ''}`.trim()
+      notifyAllExcept(
+        userProfile?.id,
+        'vt_request',
+        'Nouvelle demande de VT',
+        `Faite par ${requesterName} pour ${clientName}`,
+        { target_sheet: targetSheet }
+      )
+
       setSuccess(true)
       setFormData({
         nom: '',
@@ -106,6 +144,16 @@ export default function VTRequestModal({ isOpen, onClose }) {
         commercial: '',
         typeClient: 'btoc',
         typeContrat: 'comptant',
+        puissance: '',
+        adresse: '',
+        codePostal: '',
+        commune: '',
+        email: '',
+        tel: '',
+        reventeSurplus: '',
+        contratMaintenance: '',
+        batterie: '',
+        priseSécurisée: '',
       })
 
       setTimeout(() => {
@@ -222,6 +270,140 @@ export default function VTRequestModal({ isOpen, onClose }) {
                   {formData.typeClient === 'btob' && (
                     <span className="form-hint">BtoB utilise un onglet dédié</span>
                   )}
+                </div>
+              </div>
+
+              <div className="form-section-title">Projet</div>
+
+              <div className="form-group">
+                <label htmlFor="puissance">Puissance envisagée (kWc)</label>
+                <input
+                  type="text"
+                  id="puissance"
+                  name="puissance"
+                  value={formData.puissance}
+                  onChange={handleChange}
+                  placeholder="Ex: 3, 6, 9..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="adresse">Adresse</label>
+                <input
+                  type="text"
+                  id="adresse"
+                  name="adresse"
+                  value={formData.adresse}
+                  onChange={handleChange}
+                  placeholder="Adresse de pose"
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="codePostal">Code postal</label>
+                  <input
+                    type="text"
+                    id="codePostal"
+                    name="codePostal"
+                    value={formData.codePostal}
+                    onChange={handleChange}
+                    placeholder="Code postal"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="commune">Commune</label>
+                  <input
+                    type="text"
+                    id="commune"
+                    name="commune"
+                    value={formData.commune}
+                    onChange={handleChange}
+                    placeholder="Commune"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="email">E-mail</label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="E-mail du client"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="tel">Téléphone</label>
+                  <input
+                    type="tel"
+                    id="tel"
+                    name="tel"
+                    value={formData.tel}
+                    onChange={handleChange}
+                    placeholder="Téléphone du client"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="reventeSurplus">AC avec revente du surplus</label>
+                  <select
+                    id="reventeSurplus"
+                    name="reventeSurplus"
+                    value={formData.reventeSurplus}
+                    onChange={handleChange}
+                  >
+                    <option value="">-</option>
+                    <option value="oui">Oui</option>
+                    <option value="non">Non</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="contratMaintenance">Contrat de maintenance</label>
+                  <select
+                    id="contratMaintenance"
+                    name="contratMaintenance"
+                    value={formData.contratMaintenance}
+                    onChange={handleChange}
+                  >
+                    <option value="">-</option>
+                    <option value="oui">Oui</option>
+                    <option value="non">Non</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="batterie">Batterie</label>
+                  <input
+                    type="text"
+                    id="batterie"
+                    name="batterie"
+                    value={formData.batterie}
+                    onChange={handleChange}
+                    placeholder="Batterie"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="priseSécurisée">Prise sécurisée</label>
+                  <input
+                    type="text"
+                    id="priseSécurisée"
+                    name="priseSécurisée"
+                    value={formData.priseSécurisée}
+                    onChange={handleChange}
+                    placeholder="Prise sécurisée"
+                  />
                 </div>
               </div>
 

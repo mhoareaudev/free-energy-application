@@ -1,14 +1,20 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
+import { FileText, Filter } from 'lucide-react'
 import { useSpreadsheet } from '../context/SpreadsheetContext'
-import { getSheetColumns } from '../data/sheetsConfig'
+import { useAuth } from '../context/AuthContext'
+import { getSheetColumns, getColumnIdToLetterMap } from '../data/sheetsConfig'
+import { supabase } from '../lib/supabase'
 import ContextMenu from './ContextMenu'
 import HeaderContextMenu from './HeaderContextMenu'
+import PdfViewerModal from './PdfViewerModal'
 import './Spreadsheet.css'
 
 const TOTAL_ROWS = 999
 const VISIBLE_BUFFER = 10
 const ROW_HEIGHT = 28
 const ROW_NUMBER_WIDTH = 40
+const ACTION_COL_WIDTH = 30
 
 export default function Spreadsheet() {
   const {
@@ -25,6 +31,8 @@ export default function Spreadsheet() {
     setRowHeight,
     getRowHeight,
     pasteFromClipboard,
+    setPendingEdit,
+    vtFormData,
   } = useSpreadsheet()
 
   const containerRef = useRef(null)
@@ -40,16 +48,76 @@ export default function Spreadsheet() {
   const [contextMenu, setContextMenu] = useState(null)
   const [headerContextMenu, setHeaderContextMenu] = useState(null)
 
+  // PDF viewer modal
+  const [pdfModalData, setPdfModalData] = useState(null)
+
+  // Column filter (CHARGES_AFFAIRES)
+  const [columnFilter, setColumnFilter] = useState(null) // null = no filter, string = filter value
+  const [showColumnFilter, setShowColumnFilter] = useState(false)
+  const [filterDropdownPos, setFilterDropdownPos] = useState(null) // { top, left }
+  const columnFilterRef = useRef(null)
+  const filterBtnRef = useRef(null)
+
+  // Cell dropdown position (for portal rendering)
+  const [cellDropdownPos, setCellDropdownPos] = useState(null) // { top, left, width }
+
   // Column/row resize state
   const [resizing, setResizing] = useState(null) // { type: 'column'|'row', index, startPos, startSize }
   const resizeRef = useRef(null)
+
+  // Role-based column group visibility
+  const { userProfile } = useAuth()
+  const [roleHiddenGroups, setRoleHiddenGroups] = useState({})
+
+  // Techniciens list for CHARGES_AFFAIRES dropdown
+  const [techniciens, setTechniciens] = useState([])
+
+  useEffect(() => {
+    const fetchTechniciens = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, nom, prenom')
+          .eq('role', 'technique')
+          .order('nom')
+        if (!error && data) setTechniciens(data)
+      } catch (err) {
+        console.error('Error fetching techniciens:', err)
+      }
+    }
+    fetchTechniciens()
+  }, [])
+
+  // Fetch role-based hidden groups for current user
+  useEffect(() => {
+    const role = userProfile?.role
+    if (!role || role === 'administrateur') {
+      setRoleHiddenGroups({})
+      return
+    }
+    const fetchVisibility = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('role_visibility')
+          .select('hidden_groups')
+          .eq('role', role)
+          .single()
+        if (!error && data) {
+          setRoleHiddenGroups(data.hidden_groups || {})
+        }
+      } catch {
+        // No config for this role = all visible
+      }
+    }
+    fetchVisibility()
+  }, [userProfile?.role])
 
   const columnsConfig = useMemo(() => getSheetColumns(activeSheet), [activeSheet])
 
   // Calculate all columns with their positions (using custom widths if available)
   const allColumns = useMemo(() => {
     const cols = []
-    let position = ROW_NUMBER_WIDTH // Start after row number column
+    let position = ROW_NUMBER_WIDTH + ACTION_COL_WIDTH // Start after row number + action column
 
     // Frozen columns
     columnsConfig.frozen.forEach((col, index) => {
@@ -68,9 +136,14 @@ export default function Spreadsheet() {
 
     const frozenWidth = position // Includes ROW_NUMBER_WIDTH + frozen columns
 
-    // Group columns
-    columnsConfig.groups.forEach((group) => {
-      group.columns.forEach((col) => {
+    // Hidden groups for current sheet (based on user role)
+    const hiddenForSheet = roleHiddenGroups[activeSheet] || []
+
+    // Group columns (skip hidden groups)
+    columnsConfig.groups.forEach((group, groupIdx) => {
+      if (hiddenForSheet.includes(group.name)) return
+
+      group.columns.forEach((col, colIdx) => {
         const index = cols.length
         const customWidth = getColumnWidth(activeSheet, index, col.width)
         cols.push({
@@ -81,6 +154,8 @@ export default function Spreadsheet() {
           defaultWidth: col.width,
           isFrozen: false,
           groupName: group.name,
+          groupColors: group.colors,
+          isGroupStart: colIdx === 0,
           letter: getColumnLetter(index),
         })
         position += customWidth
@@ -88,21 +163,108 @@ export default function Spreadsheet() {
     })
 
     return { columns: cols, frozenWidth, totalWidth: position }
-  }, [columnsConfig, activeSheet, getColumnWidth])
+  }, [columnsConfig, activeSheet, getColumnWidth, roleHiddenGroups])
 
   // Memoize frozen and non-frozen columns
   const frozenCols = useMemo(() => allColumns.columns.filter((col) => col.isFrozen), [allColumns.columns])
   const nonFrozenCols = useMemo(() => allColumns.columns.filter((col) => !col.isFrozen), [allColumns.columns])
 
+  // Reverse map: column letter → column ID (e.g. 'AN' → 'CHARGES_AFFAIRES')
+  const letterToColId = useMemo(() => {
+    const map = {}
+    allColumns.columns.forEach(col => {
+      map[col.letter] = col.id
+    })
+    return map
+  }, [allColumns.columns])
+
+  // Columns that use a dropdown instead of free text
+  const DROPDOWN_COLUMNS = new Set(['CHARGES_AFFAIRES'])
+
+  const isDropdownCell = useCallback((cellId) => {
+    const match = cellId.match(/^([A-Z]+)(\d+)$/)
+    if (!match) return false
+    return DROPDOWN_COLUMNS.has(letterToColId[match[1]])
+  }, [letterToColId])
+
+  // CHARGES_AFFAIRES column letter for the current sheet
+  const chargesAffairesLetter = useMemo(() => {
+    const col = allColumns.columns.find(c => c.id === 'CHARGES_AFFAIRES')
+    return col?.letter || null
+  }, [allColumns.columns])
+
+  // Unique non-empty values in CHARGES_AFFAIRES for filter options
+  const uniqueChargesAffaires = useMemo(() => {
+    if (!chargesAffairesLetter) return []
+    const values = new Set()
+    for (let row = 1; row <= TOTAL_ROWS; row++) {
+      const val = getCellValue(activeSheet, `${chargesAffairesLetter}${row}`)
+      if (val) values.add(val)
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b, 'fr'))
+  }, [chargesAffairesLetter, activeSheet, getCellValue])
+
+  // Filtered row indices (0-based). When no filter, all rows are included.
+  const filteredRowIndices = useMemo(() => {
+    if (!columnFilter || !chargesAffairesLetter) return null // null = no filter
+    const indices = []
+    for (let rowIndex = 0; rowIndex < TOTAL_ROWS; rowIndex++) {
+      const rowNumber = rowIndex + 1
+      const val = getCellValue(activeSheet, `${chargesAffairesLetter}${rowNumber}`)
+      if (val === columnFilter) {
+        indices.push(rowIndex)
+      }
+    }
+    return indices
+  }, [columnFilter, chargesAffairesLetter, activeSheet, getCellValue])
+
+  const totalDisplayedRows = filteredRowIndices ? filteredRowIndices.length : TOTAL_ROWS
+
+  // Close filter dropdown on outside click
+  useEffect(() => {
+    if (!showColumnFilter) return
+    const handleClick = (e) => {
+      const inDropdown = columnFilterRef.current && columnFilterRef.current.contains(e.target)
+      const inButton = filterBtnRef.current && filterBtnRef.current.contains(e.target)
+      if (!inDropdown && !inButton) {
+        setShowColumnFilter(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showColumnFilter])
+
+  // Close cell dropdown on outside click
+  useEffect(() => {
+    if (!editingCell || !cellDropdownPos || !isDropdownCell(editingCell)) return
+    const handleClick = (e) => {
+      // Check if click is inside the portal dropdown
+      const portal = document.querySelector('.cell-dropdown-portal')
+      if (portal && portal.contains(e.target)) return
+      // Click outside: close dropdown without saving
+      setEditingCell(null)
+      setEditValue('')
+      setCellDropdownPos(null)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [editingCell, cellDropdownPos, isDropdownCell, setEditingCell])
+
+  // Reset filter when sheet changes
+  useEffect(() => {
+    setColumnFilter(null)
+    setShowColumnFilter(false)
+  }, [activeSheet])
+
   // Calculate visible rows
   const visibleRows = useMemo(() => {
     const startRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - VISIBLE_BUFFER)
     const endRow = Math.min(
-      TOTAL_ROWS,
+      totalDisplayedRows,
       Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + VISIBLE_BUFFER
     )
     return { startRow, endRow }
-  }, [scrollTop, containerHeight])
+  }, [scrollTop, containerHeight, totalDisplayedRows])
 
   // Calculate visible columns (non-frozen)
   const visibleColumns = useMemo(() => {
@@ -235,6 +397,7 @@ export default function Spreadsheet() {
 
   // Handle cell double click
   const handleCellDoubleClick = useCallback((cellId) => {
+    setCellDropdownPos(null) // Reset portal position for new cell
     setEditingCell(cellId)
     setEditValue(getCellValue(activeSheet, cellId))
   }, [activeSheet, getCellValue, setEditingCell])
@@ -243,6 +406,40 @@ export default function Spreadsheet() {
   const handleCellEdit = useCallback((e) => {
     setEditValue(e.target.value)
   }, [])
+
+  // Handle dropdown select (for CHARGES_AFFAIRES etc.)
+  const handleDropdownSelect = useCallback((value) => {
+    if (editingCell) {
+      setCellValue(activeSheet, editingCell, value)
+
+      // Update __vtFormData for this row so PDF includes chargé d'affaires
+      const match = editingCell.match(/^([A-Z]+)(\d+)$/)
+      if (match && letterToColId[match[1]] === 'CHARGES_AFFAIRES') {
+        const rowNumber = match[2]
+        const existingJson = getCellValue(activeSheet, `__vtFormData:${rowNumber}`)
+        if (existingJson) {
+          try {
+            const vtData = JSON.parse(existingJson)
+            vtData.chargesAffaires = value
+            setCellValue(activeSheet, `__vtFormData:${rowNumber}`, JSON.stringify(vtData))
+          } catch { /* ignore parse errors */ }
+        }
+      }
+
+      setEditingCell(null)
+      setEditValue('')
+      setCellDropdownPos(null)
+    }
+  }, [activeSheet, editingCell, setCellValue, setEditingCell, letterToColId, getCellValue])
+
+  // Keep context informed of pending edit (so save can commit it)
+  useEffect(() => {
+    if (editingCell) {
+      setPendingEdit(activeSheet, editingCell, editValue)
+    } else {
+      setPendingEdit(null, null, null)
+    }
+  }, [editingCell, editValue, activeSheet, setPendingEdit])
 
   // Handle cell edit complete
   const handleCellEditComplete = useCallback(() => {
@@ -260,6 +457,7 @@ export default function Spreadsheet() {
     } else if (e.key === 'Escape') {
       setEditingCell(null)
       setEditValue('')
+      setCellDropdownPos(null)
     }
   }, [handleCellEditComplete, setEditingCell])
 
@@ -452,22 +650,26 @@ export default function Spreadsheet() {
     let currentGroup = null
     let groupStartPos = 0
 
+    let currentGroupColors = null
     nonFrozenCols.forEach((col, index) => {
       if (col.groupName !== currentGroup) {
         if (currentGroup !== null) {
           groups.push({
             name: currentGroup,
+            colors: currentGroupColors,
             startPos: groupStartPos,
             width: col.position - allColumns.frozenWidth - groupStartPos,
           })
         }
         currentGroup = col.groupName
+        currentGroupColors = col.groupColors
         groupStartPos = col.position - allColumns.frozenWidth
       }
     })
     if (currentGroup !== null) {
       groups.push({
         name: currentGroup,
+        colors: currentGroupColors,
         startPos: groupStartPos,
         width: allColumns.totalWidth - allColumns.frozenWidth - groupStartPos,
       })
@@ -482,6 +684,7 @@ export default function Spreadsheet() {
             style={{ width: allColumns.frozenWidth }}
           >
             <div className="header-cell corner-cell" style={{ width: ROW_NUMBER_WIDTH }} />
+            <div className="header-cell action-col-header" style={{ width: ACTION_COL_WIDTH }} />
             {frozenCols.map((col) => {
               const isSelected = selectedCells.some((cellId) => {
                 const [letter] = parseCellId(cellId)
@@ -521,6 +724,10 @@ export default function Spreadsheet() {
                     position: 'absolute',
                     left: col.position - allColumns.frozenWidth,
                     width: col.width,
+                    backgroundColor: col.groupColors?.dark || undefined,
+                    borderTop: `1px solid ${col.groupColors?.border || 'var(--border-light)'}`,
+                    borderBottom: `1px solid ${col.groupColors?.border || 'var(--border-light)'}`,
+                    borderLeft: col.isGroupStart ? `2px solid ${col.groupColors?.border || 'var(--border-medium)'}` : undefined,
                   }}
                   onClick={() => selectColumn(col.letter)}
                   onContextMenu={(e) => handleColumnContextMenu(e, col.letter)}
@@ -543,6 +750,7 @@ export default function Spreadsheet() {
             style={{ width: allColumns.frozenWidth }}
           >
             <div className="header-cell corner-cell" style={{ width: ROW_NUMBER_WIDTH }} />
+            <div className="header-cell action-col-header" style={{ width: ACTION_COL_WIDTH }} />
             {frozenCols.map((col) => (
               <div
                 key={col.id}
@@ -563,6 +771,10 @@ export default function Spreadsheet() {
                   position: 'absolute',
                   left: group.startPos,
                   width: group.width,
+                  backgroundColor: group.colors?.dark || undefined,
+                  borderTop: `1px solid ${group.colors?.border || 'var(--border-light)'}`,
+                  borderBottom: `1px solid ${group.colors?.border || 'var(--border-light)'}`,
+                  borderLeft: `2px solid ${group.colors?.border || 'var(--border-medium)'}`,
                 }}
               >
                 {group.name}
@@ -578,6 +790,7 @@ export default function Spreadsheet() {
             style={{ width: allColumns.frozenWidth }}
           >
             <div className="header-cell corner-cell" style={{ width: ROW_NUMBER_WIDTH }} />
+            <div className="header-cell action-col-header" style={{ width: ACTION_COL_WIDTH }} title="PDF VT" />
             {frozenCols.map((col) => {
               const isSelected = selectedCells.some((cellId) => {
                 const [letter] = parseCellId(cellId)
@@ -603,17 +816,41 @@ export default function Spreadsheet() {
                 const [letter] = parseCellId(cellId)
                 return letter === col.letter
               })
+              const hasFilter = col.id === 'CHARGES_AFFAIRES'
               return (
                 <div
                   key={col.id}
-                  className={`header-cell column-header ${isSelected ? 'selected' : ''}`}
+                  className={`header-cell column-header ${isSelected ? 'selected' : ''} ${hasFilter ? 'filterable' : ''}`}
                   style={{
                     position: 'absolute',
                     left: col.position - allColumns.frozenWidth,
                     width: col.width,
+                    backgroundColor: col.groupColors?.medium || undefined,
+                    borderTop: `1px solid ${col.groupColors?.border || 'var(--border-light)'}`,
+                    borderBottom: `1px solid ${col.groupColors?.border || 'var(--border-light)'}`,
+                    borderLeft: col.isGroupStart ? `2px solid ${col.groupColors?.border || 'var(--border-medium)'}` : undefined,
                   }}
                 >
-                  {col.label}
+                  <span className="column-header-label">{col.label}</span>
+                  {hasFilter && (
+                    <button
+                      ref={filterBtnRef}
+                      className={`column-filter-btn ${columnFilter ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (showColumnFilter) {
+                          setShowColumnFilter(false)
+                        } else {
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setFilterDropdownPos({ top: rect.bottom + 4, left: rect.right - 200 })
+                          setShowColumnFilter(true)
+                        }
+                      }}
+                      title="Filtrer"
+                    >
+                      <Filter size={12} />
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -627,7 +864,10 @@ export default function Spreadsheet() {
   const renderRows = () => {
     const rows = []
 
-    for (let rowIndex = visibleRows.startRow; rowIndex < visibleRows.endRow; rowIndex++) {
+    for (let displayIndex = visibleRows.startRow; displayIndex < visibleRows.endRow; displayIndex++) {
+      // When filtered, map display index → actual row index
+      const rowIndex = filteredRowIndices ? filteredRowIndices[displayIndex] : displayIndex
+      if (rowIndex === undefined) continue
       const rowNumber = rowIndex + 1
       const isRowSelected = selectedCells.some((cellId) => {
         const [, row] = parseCellId(cellId)
@@ -642,7 +882,7 @@ export default function Spreadsheet() {
           className="spreadsheet-row"
           style={{
             position: 'absolute',
-            top: rowIndex * ROW_HEIGHT, // TODO: calculate cumulative height for variable row heights
+            top: displayIndex * ROW_HEIGHT,
             height: rowHeight,
           }}
         >
@@ -663,6 +903,56 @@ export default function Spreadsheet() {
                 onMouseDown={(e) => handleRowResizeStart(e, rowIndex, getRowHeight(activeSheet, rowIndex, ROW_HEIGHT))}
               />
             </div>
+            {/* PDF action column */}
+            <div
+              className="cell action-col-cell"
+              style={{ width: ACTION_COL_WIDTH }}
+            >
+              {getCellValue(activeSheet, `A${rowNumber}`) && (
+                <button
+                  className="pdf-icon-btn"
+                  title="Voir le formulaire VT"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    // Read PDF data from cells (persists across reloads)
+                    const colMap = getColumnIdToLetterMap(activeSheet)
+                    const getCell = (colId) => {
+                      const letter = colMap[colId]
+                      return letter ? getCellValue(activeSheet, `${letter}${rowNumber}`) : ''
+                    }
+                    const clientColId = activeSheet === 'btoc-comptant' ? 'Colonne1' : 'NOM_PRENOM'
+                    const cellData = {
+                      commercial: getCell('COMMERCIAL'),
+                      clientName: getCell(clientColId),
+                      date: getCell('DATE_DDE_VT'),
+                      adresse: getCell('ADRESSE_INSTALLATION'),
+                      codePostal: getCell('CODE_POSTAL'),
+                      commune: getCell('VILLE'),
+                      email: getCell('EMAIL'),
+                      tel: getCell('TELEPHONE'),
+                      typeContrat: activeSheet === 'btoc-abonnement' ? 'abonnement' : 'comptant',
+                      contratMaintenance: getCell('CONTRAT_MAINTENANCE'),
+                      puissance: getCell('PUISSANCE_PREVI') || getCell('PUISSANCE_REALISEE'),
+                      chargesAffaires: getCell('CHARGES_AFFAIRES'),
+                    }
+                    // Merge with persisted vtFormData from DB (stored as __vtFormData:row in cells)
+                    const persistedJson = getCellValue(activeSheet, `__vtFormData:${rowNumber}`)
+                    const persistedData = persistedJson ? JSON.parse(persistedJson) : null
+                    // Fall back to in-memory vtFormData (before first save)
+                    const storedData = persistedData || vtFormData[`${activeSheet}:${rowNumber}`]
+                    if (storedData) {
+                      Object.keys(storedData).forEach(key => {
+                        if (!cellData[key]) cellData[key] = storedData[key]
+                      })
+                    }
+                    setPdfModalData(cellData)
+                  }}
+                >
+                  <FileText size={14} />
+                </button>
+              )}
+            </div>
+
             {frozenCols.map((col) => {
               const cellId = getCellId(col.index, rowIndex)
               const isSelected = isCellSelected(cellId)
@@ -711,6 +1001,7 @@ export default function Spreadsheet() {
               const value = getCellValue(activeSheet, cellId)
               const style = getCellStyle(activeSheet, cellId)
               const borderClasses = getSelectionBorderClasses(cellId)
+              const isDropdown = DROPDOWN_COLUMNS.has(col.id)
 
               return (
                 <div
@@ -720,6 +1011,8 @@ export default function Spreadsheet() {
                     position: 'absolute',
                     left: col.position - allColumns.frozenWidth,
                     width: col.width,
+                    backgroundColor: isSelected ? undefined : col.groupColors?.light || undefined,
+                    borderLeft: col.isGroupStart ? `2px solid ${col.groupColors?.border || 'var(--border-medium)'}` : undefined,
                   }}
                   onClick={(e) => handleCellClick(cellId, e)}
                   onDoubleClick={() => handleCellDoubleClick(cellId)}
@@ -727,7 +1020,17 @@ export default function Spreadsheet() {
                   onMouseEnter={() => handleMouseEnter(cellId)}
                   onContextMenu={(e) => handleContextMenu(e, cellId)}
                 >
-                  {isEditing ? (
+                  {isEditing && isDropdown ? (
+                    <div
+                      className="cell-dropdown-anchor"
+                      ref={(el) => {
+                        if (el && !cellDropdownPos) {
+                          const rect = el.getBoundingClientRect()
+                          setCellDropdownPos({ top: rect.top, left: rect.left, width: Math.max(rect.width, 180) })
+                        }
+                      }}
+                    />
+                  ) : isEditing ? (
                     <input
                       type="text"
                       className="cell-input"
@@ -765,7 +1068,7 @@ export default function Spreadsheet() {
         <div
           className="spreadsheet-content"
           style={{
-            height: TOTAL_ROWS * ROW_HEIGHT,
+            height: totalDisplayedRows * ROW_HEIGHT,
             width: allColumns.totalWidth,
           }}
         >
@@ -790,6 +1093,81 @@ export default function Spreadsheet() {
           index={headerContextMenu.index}
           onClose={closeHeaderContextMenu}
         />
+      )}
+
+      <PdfViewerModal
+        isOpen={!!pdfModalData}
+        onClose={() => setPdfModalData(null)}
+        data={pdfModalData}
+      />
+
+      {/* Filter dropdown portal */}
+      {showColumnFilter && filterDropdownPos && createPortal(
+        <div
+          ref={columnFilterRef}
+          className="column-filter-dropdown"
+          style={{ position: 'fixed', top: filterDropdownPos.top, left: filterDropdownPos.left }}
+        >
+          <div className="column-filter-header">Filtrer par technicien</div>
+          <div className="column-filter-options">
+            <button
+              className={`column-filter-option ${!columnFilter ? 'selected' : ''}`}
+              onClick={() => { setColumnFilter(null); setShowColumnFilter(false) }}
+            >
+              Tous
+            </button>
+            {uniqueChargesAffaires.map((name) => (
+              <button
+                key={name}
+                className={`column-filter-option ${columnFilter === name ? 'selected' : ''}`}
+                onClick={() => { setColumnFilter(name); setShowColumnFilter(false) }}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+          {columnFilter && (
+            <div className="column-filter-footer">
+              <button
+                className="column-filter-clear"
+                onClick={() => { setColumnFilter(null); setShowColumnFilter(false) }}
+              >
+                Effacer le filtre
+              </button>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+
+      {/* Cell dropdown portal (CHARGES_AFFAIRES) */}
+      {editingCell && cellDropdownPos && isDropdownCell(editingCell) && createPortal(
+        <div
+          className="cell-dropdown-portal"
+          style={{ position: 'fixed', top: cellDropdownPos.top, left: cellDropdownPos.left, width: cellDropdownPos.width }}
+        >
+          <div className="cell-dropdown-list">
+            <button
+              className={`cell-dropdown-option ${!editValue ? 'selected' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); handleDropdownSelect('') }}
+            >
+              -- Aucun --
+            </button>
+            {techniciens.map((t) => {
+              const fullName = `${t.prenom} ${t.nom}`
+              return (
+                <button
+                  key={t.id}
+                  className={`cell-dropdown-option ${editValue === fullName ? 'selected' : ''}`}
+                  onMouseDown={(e) => { e.preventDefault(); handleDropdownSelect(fullName) }}
+                >
+                  {fullName}
+                </button>
+              )
+            })}
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   )

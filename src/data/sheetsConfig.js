@@ -3,20 +3,32 @@
 export const SHEETS = [
   {
     id: 'btoc-comptant',
-    name: 'Suivi activités BtoC – Comptant',
+    name: 'Suivi activit\u00e9s BtoC \u2013 Comptant',
     frozenColumns: ['COMMERCIAL', 'OBJECTIF', 'Colonne1'],
   },
   {
     id: 'btoc-abonnement',
-    name: 'Suivi activités BtoC – Abonnement',
+    name: 'Suivi activit\u00e9s BtoC \u2013 Abonnement',
     frozenColumns: ['COMMERCIAL', 'OBJECTIFN', 'NOM - PRENOM CLIENT'],
   },
   {
     id: 'btob',
-    name: 'Suivi activités BtoB',
+    name: 'Suivi activit\u00e9s BtoB',
     frozenColumns: ['COMMERCIAL', 'OBJECTIF', 'NOM - PRENOM CLIENT'],
   },
 ]
+
+// Color palette: border (contours), dark (lettres + groupes), medium (titres colonnes), light (cellules)
+const COLORS = {
+  jaune:     { border: '#E5A700', dark: '#FCD34D', medium: '#FDE68A', light: '#FFFBEB' },
+  bleu:      { border: '#3B82F6', dark: '#93C5FD', medium: '#BFDBFE', light: '#EFF6FF' },
+  vert:      { border: '#10B981', dark: '#6EE7B7', medium: '#A7F3D0', light: '#ECFDF5' },
+  rouge:     { border: '#EF4444', dark: '#FCA5A5', medium: '#FECACA', light: '#FEF2F2' },
+  mauve:     { border: '#8B5CF6', dark: '#C4B5FD', medium: '#DDD6FE', light: '#F5F3FF' },
+  gris:      { border: '#9CA3AF', dark: '#D1D5DB', medium: '#E5E7EB', light: '#F9FAFB' },
+  bleuClair: { border: '#0EA5E9', dark: '#7DD3FC', medium: '#BAE6FD', light: '#F0F9FF' },
+  bleuFonce: { border: '#6366F1', dark: '#818CF8', medium: '#A5B4FC', light: '#EEF2FF' },
+}
 
 // BtoC Comptant columns
 export const BTOC_COMPTANT_COLUMNS = {
@@ -28,7 +40,7 @@ export const BTOC_COMPTANT_COLUMNS = {
   groups: [
     {
       name: 'Progression prospect',
-      color: '#FEF3C7', // Jaune
+      colors: COLORS.jaune,
       columns: [
         { id: 'RDV_PRIS_LE', label: 'RDV PRIS LE', width: 110 },
         { id: 'RDV_PERDU', label: 'RDV PERDU', width: 100 },
@@ -44,8 +56,8 @@ export const BTOC_COMPTANT_COLUMNS = {
       ],
     },
     {
-      name: 'Coordonnées clients',
-      color: '#DBEAFE', // Bleu
+      name: 'Coordonn\u00e9es clients',
+      colors: COLORS.bleu,
       columns: [
         { id: 'TYPE_CONTACT', label: 'TYPE DE CONTACT', width: 130 },
         { id: 'ADRESSE_INSTALLATION', label: 'ADRESSE INSTALLATION', width: 170 },
@@ -58,25 +70,25 @@ export const BTOC_COMPTANT_COLUMNS = {
     },
     {
       name: 'Admin',
-      color: '#D1FAE5', // Vert
+      colors: COLORS.vert,
       columns: [
         { id: 'RECEPTION_BDC', label: 'RECEPTION BDC/DOSSIER', width: 170 },
         { id: 'ENREGISTREMENT_ADMIN', label: 'ENREGISTREMENT ADMINISTRATIF', width: 210 },
       ],
     },
     {
-      name: 'Règlement',
-      color: '#FEE2E2', // Rouge
+      name: 'R\u00e8glement',
+      colors: COLORS.rouge,
       columns: [
         { id: 'TOTAL_TTC', label: 'TOTAL TTC', width: 100 },
         { id: 'RESTE_ENCAISSER', label: 'RESTE A ENCAISSER', width: 150 },
         { id: 'ACOMPTE_1', label: 'Acpte 1 (Validation Technique)', width: 200 },
-        { id: 'ACOMPTE_2', label: 'Acpte 2 (Réception CNO)', width: 180 },
-        { id: 'ACOMPTE_3', label: 'Acpte 3 (Date prév pose)', width: 180 },
+        { id: 'ACOMPTE_2', label: 'Acpte 2 (R\u00e9ception CNO)', width: 180 },
+        { id: 'ACOMPTE_3', label: 'Acpte 3 (Date pr\u00e9v pose)', width: 180 },
         { id: 'SOLDE', label: 'SOLDE (Livraison)', width: 140 },
         { id: 'FINANCEMENT', label: 'FINANCEMENT', width: 120 },
         { id: 'DATE_ACCEPTATION', label: "DATE D'ACCEPTATION", width: 150 },
-        { id: 'N_AUTORISATION', label: 'N° AUTORISATION ou DOSSIER', width: 200 },
+        { id: 'N_AUTORISATION', label: 'N\u00b0 AUTORISATION ou DOSSIER', width: 200 },
         { id: 'ETAT_DOSSIER_CMOI', label: 'ETAT DU DOSSIER CMOI/SOFIDER', width: 210 },
         { id: 'DATE_DDE_PAIEMENT', label: 'DATE DE DEMANDE PAIEMENT', width: 190 },
         { id: 'DATE_PAIEMENT', label: 'DATE PAIEMENT', width: 130 },
@@ -84,7 +96,7 @@ export const BTOC_COMPTANT_COLUMNS = {
     },
     {
       name: 'Avancement du dossier',
-      color: '#EDE9FE', // Mauve
+      colors: COLORS.mauve,
       columns: [
         { id: 'DATE_DDE_VT', label: 'DATE DEMANDE DE LA VT', width: 170 },
         { id: 'ECHEANCE', label: 'ECHEANCE', width: 100 },
@@ -92,7 +104,7 @@ export const BTOC_COMPTANT_COLUMNS = {
         { id: 'DATE_RETOUR_VT', label: 'DATE RETOUR DE LA VT', width: 160 },
         { id: 'CHARGES_AFFAIRES', label: "CHARGES D'AFFAIRES", width: 150 },
         { id: 'DEMANDE_DP', label: 'DEMANDE DP', width: 110 },
-        { id: 'N_DP', label: 'N° DP', width: 80 },
+        { id: 'N_DP', label: 'N\u00b0 DP', width: 80 },
         { id: 'RECEPTION_CNO', label: 'RECEPTION CNO', width: 130 },
         { id: 'ETAT_DOSSIER', label: 'ETAT DU DOSSIER', width: 140 },
         { id: 'DATE_PREV_POSE', label: 'DATE PREVISIONNEL DE POSE', width: 190 },
@@ -101,9 +113,9 @@ export const BTOC_COMPTANT_COLUMNS = {
         { id: 'PHOTOS', label: 'PHOTOS', width: 80 },
         { id: 'ATTESTATION_ASSURANCE', label: 'ATTESTATION ASSURANCE', width: 170 },
         { id: 'DDE_RACC_EDF', label: 'DDE RACC EDF', width: 120 },
-        { id: 'N_SUIVI_EDF', label: 'N°DE SUIVI EDF', width: 130 },
+        { id: 'N_SUIVI_EDF', label: 'N\u00b0DE SUIVI EDF', width: 130 },
         { id: 'T0_REVENTE', label: 'T0 REVENTE RECU', width: 140 },
-        { id: 'N_CRAE', label: 'N°CRAE', width: 90 },
+        { id: 'N_CRAE', label: 'N\u00b0CRAE', width: 90 },
         { id: 'DDE_SUBVENTION', label: 'DDE DE SUBVENTION', width: 150 },
         { id: 'NUMERO_DOSSIER', label: 'NUMERO DE DOSSIER', width: 150 },
         { id: 'DATE_VALIDER_SUB', label: 'DATE VALIDER DE SUBVENTION', width: 200 },
@@ -117,7 +129,7 @@ export const BTOC_COMPTANT_COLUMNS = {
     },
     {
       name: 'Monophase',
-      color: '#F3F4F6', // Gris
+      colors: COLORS.gris,
       columns: [
         { id: 'MONO_OND_3KW', label: 'OND 3KW', width: 90 },
         { id: 'MONO_OND_6KW', label: 'OND 6KW', width: 90 },
@@ -127,7 +139,7 @@ export const BTOC_COMPTANT_COLUMNS = {
     },
     {
       name: 'Triphase',
-      color: '#E0F2FE', // Bleu clair
+      colors: COLORS.bleuClair,
       columns: [
         { id: 'TRI_OND_3KW', label: 'OND 3KW2', width: 90 },
         { id: 'TRI_OND_6KW', label: 'OND 6KW2', width: 90 },
@@ -148,7 +160,7 @@ export const BTOC_ABONNEMENT_COLUMNS = {
   groups: [
     {
       name: 'Progression prospect',
-      color: '#FEF3C7', // Jaune
+      colors: COLORS.jaune,
       columns: [
         { id: 'RDV_PRIS_LE', label: 'RDV PRIS LE', width: 110 },
         { id: 'RDV_PERDU', label: 'RDV PERDU', width: 100 },
@@ -160,7 +172,7 @@ export const BTOC_ABONNEMENT_COLUMNS = {
     },
     {
       name: 'Commentaires',
-      color: '#DBEAFE', // Bleu
+      colors: COLORS.bleu,
       columns: [
         { id: 'OFFRE_CHOISIE', label: "L'OFFRE CHOISIE", width: 130 },
         { id: 'OPTION_CONFORT', label: 'OPTION CONFORT (Batterie)', width: 180 },
@@ -169,8 +181,8 @@ export const BTOC_ABONNEMENT_COLUMNS = {
       ],
     },
     {
-      name: 'Coordonnées clients',
-      color: '#D1FAE5', // Vert
+      name: 'Coordonn\u00e9es clients',
+      colors: COLORS.vert,
       columns: [
         { id: 'TYPE_CONTACT', label: 'TYPE DE CONTACT', width: 130 },
         { id: 'ADRESSE_INSTALLATION', label: 'ADRESSE INSTALLATION', width: 170 },
@@ -183,19 +195,19 @@ export const BTOC_ABONNEMENT_COLUMNS = {
     },
     {
       name: 'Admin',
-      color: '#FEE2E2', // Rouge
+      colors: COLORS.rouge,
       columns: [
         { id: 'RECEPTION_BDC', label: 'RECEPTION BDC/DOSSIER', width: 170 },
         { id: 'ENREGISTREMENT_ADMIN', label: 'ENREGISTREMENT ADMINISTRATIF', width: 210 },
       ],
     },
     {
-      name: 'Informations règlements',
-      color: '#EDE9FE', // Mauve
+      name: 'Informations r\u00e8glements',
+      colors: COLORS.mauve,
       columns: [
         { id: 'INFO_COL1', label: 'Colonne1', width: 100 },
-        { id: 'MONTANT_DEPOT_GARANTIE', label: 'MONTANT DU DEPÔT DE GARANTIE', width: 220 },
-        { id: 'DATE_ENCAISSEMENT', label: 'DATE ENCAISSEMENT DEPÔT GARANTIE', width: 240 },
+        { id: 'MONTANT_DEPOT_GARANTIE', label: 'MONTANT DU DEP\u00d4T DE GARANTIE', width: 220 },
+        { id: 'DATE_ENCAISSEMENT', label: 'DATE ENCAISSEMENT DEP\u00d4T GARANTIE', width: 240 },
         { id: 'DDE_SUBVENTION', label: 'DDE DE SUBVENTION', width: 150 },
         { id: 'DATE_VALIDER_SUB', label: 'DATE VALIDER DE SUBVENTION', width: 200 },
         { id: 'FIN_VALIDATION_SUB', label: 'FIN DE VALIDATION SUBVENTION', width: 210 },
@@ -213,14 +225,14 @@ export const BTOC_ABONNEMENT_COLUMNS = {
     },
     {
       name: 'Avancement du dossier',
-      color: '#F3F4F6', // Gris
+      colors: COLORS.gris,
       columns: [
         { id: 'DATE_DDE_VT', label: 'DATE DEMANDE DE LA VT', width: 170 },
         { id: 'DATE_PREV_VT', label: 'DATE PREV DE LA VT', width: 150 },
         { id: 'DATE_RETOUR_VT', label: 'DATE RETOUR DE LA VT', width: 160 },
         { id: 'CHARGES_AFFAIRES', label: "CHARGES D'AFFAIRES", width: 150 },
         { id: 'DEMANDE_DP', label: 'DEMANDE DP', width: 110 },
-        { id: 'N_DP', label: 'N° DP', width: 80 },
+        { id: 'N_DP', label: 'N\u00b0 DP', width: 80 },
         { id: 'RECEPTION_CNO', label: 'RECEPTION CNO', width: 130 },
         { id: 'ETAT_DOSSIER', label: 'ETAT DU DOSSIER', width: 140 },
         { id: 'DATE_PREV_POSE', label: 'DATE PREVISIONNEL DE POSE', width: 190 },
@@ -230,9 +242,9 @@ export const BTOC_ABONNEMENT_COLUMNS = {
         { id: 'ATTESTATION_ASSURANCE', label: 'ATTESTATION ASSURANCE', width: 170 },
         { id: 'ELIGIBILITE', label: 'ELIGIBILITE', width: 100 },
         { id: 'DDE_RACC_EDF', label: 'DDE RACC EDF', width: 120 },
-        { id: 'N_SUIVI_EDF', label: 'N°DE SUIVI EDF', width: 130 },
+        { id: 'N_SUIVI_EDF', label: 'N\u00b0DE SUIVI EDF', width: 130 },
         { id: 'T0_REVENTE', label: 'T0 REVENTE RECU', width: 140 },
-        { id: 'N_CRAE', label: 'N°CRAE', width: 90 },
+        { id: 'N_CRAE', label: 'N\u00b0CRAE', width: 90 },
         { id: 'DDE_SUBVENTION2', label: 'DDE DE SUBVENTION2', width: 160 },
         { id: 'NUMERO_DOSSIER', label: 'NUMERO DOSSIER', width: 140 },
         { id: 'DATE_VALIDER_SUB2', label: 'DATE VALIDER DE SUBVENTION2', width: 210 },
@@ -246,7 +258,7 @@ export const BTOC_ABONNEMENT_COLUMNS = {
     },
     {
       name: 'Monophase',
-      color: '#E0F2FE', // Bleu clair
+      colors: COLORS.bleuClair,
       columns: [
         { id: 'MONO_OND_3KW', label: 'OND 3KW', width: 90 },
         { id: 'MONO_OND_6KW', label: 'OND 6KW', width: 90 },
@@ -256,7 +268,7 @@ export const BTOC_ABONNEMENT_COLUMNS = {
     },
     {
       name: 'Triphase',
-      color: '#BFDBFE', // Bleu foncé
+      colors: COLORS.bleuFonce,
       columns: [
         { id: 'TRI_OND_3KW', label: 'OND 3KW', width: 90 },
         { id: 'TRI_OND_6KW', label: 'OND 6KW', width: 90 },
@@ -277,6 +289,7 @@ export const BTOB_COLUMNS = {
   groups: [
     {
       name: 'Progression prospect',
+      colors: COLORS.jaune,
       columns: [
         { id: 'PUISSANCE_REALISEE', label: 'PUISSANCE REALISEE', width: 150 },
         { id: 'SIGNE_LE', label: 'SIGNE LE', width: 100 },
@@ -285,6 +298,7 @@ export const BTOB_COLUMNS = {
     },
     {
       name: 'Coordonnees clients',
+      colors: COLORS.bleu,
       columns: [
         { id: 'TYPE_CONTACT', label: 'TYPE DE CONTACT', width: 130 },
         { id: 'ADRESSE_INSTALLATION', label: 'ADRESSE INSTALLATION', width: 170 },
@@ -296,19 +310,21 @@ export const BTOB_COLUMNS = {
       ],
     },
     {
-      name: 'Administratif/Règlement',
+      name: 'Administratif/R\u00e8glement',
+      colors: COLORS.vert,
       columns: [
         { id: 'TOTAL_TTC', label: 'TOTAL TTC', width: 100 },
         { id: 'RESTE_ENCAISSER', label: 'RESTE A ENCAISSER', width: 150 },
-        { id: 'DEVIS_QUADRA', label: 'DEVIS créé sur QUADRA/PENNYLANCE', width: 220 },
-        { id: 'DDE_ACOMPTE_1', label: 'DEMANDE D\'ACOMPTE N°1 - SIGNATURE DU DEVIS', width: 280 },
-        { id: 'DDE_ACOMPTE_2', label: 'DEMANDE D\'ACOMPTE N°2 - COMMANDE DU MATERIEL', width: 290 },
-        { id: 'DDE_ACOMPTE_3', label: 'DEMANDE D\'ACOMPTE N°3 - DEMARRAGE DES TRAVAUX', width: 300 },
+        { id: 'DEVIS_QUADRA', label: 'DEVIS cr\u00e9\u00e9 sur QUADRA/PENNYLANCE', width: 220 },
+        { id: 'DDE_ACOMPTE_1', label: 'DEMANDE D\'ACOMPTE N\u00b01 - SIGNATURE DU DEVIS', width: 280 },
+        { id: 'DDE_ACOMPTE_2', label: 'DEMANDE D\'ACOMPTE N\u00b02 - COMMANDE DU MATERIEL', width: 290 },
+        { id: 'DDE_ACOMPTE_3', label: 'DEMANDE D\'ACOMPTE N\u00b03 - DEMARRAGE DES TRAVAUX', width: 300 },
         { id: 'DDE_SOLDE', label: 'DEMANDE DE SOLDE', width: 150 },
       ],
     },
     {
       name: 'Avancement du dossier',
+      colors: COLORS.rouge,
       columns: [
         { id: 'DATE_DDE_VT', label: 'DATE DEMANDE DE LA VT', width: 170 },
         { id: 'DATE_PREV_VT', label: 'DATE PREVISONNEL VT', width: 150 },
@@ -321,15 +337,16 @@ export const BTOB_COLUMNS = {
         { id: 'PHOTOS', label: 'PHOTOS', width: 80 },
         { id: 'ATTESTATION_ASSURANCE', label: 'ATTESTATION ASSURANCE', width: 170 },
         { id: 'DDE_RACC_EDF', label: 'DDE RACC EDF', width: 120 },
-        { id: 'N_SUIVI_EDF', label: 'N°DE SUIVI EDF', width: 130 },
+        { id: 'N_SUIVI_EDF', label: 'N\u00b0DE SUIVI EDF', width: 130 },
         { id: 'T0_RECU', label: 'T0 RECU', width: 90 },
         { id: 'DDE_CONSUEL', label: 'DDE CONSUEL', width: 110 },
-        { id: 'CONSUEL_VALIDE', label: 'CONSUEL Validé', width: 130 },
+        { id: 'CONSUEL_VALIDE', label: 'CONSUEL Valid\u00e9', width: 130 },
         { id: 'MES_EDF', label: 'MES EDF', width: 90 },
       ],
     },
     {
       name: 'Monophase',
+      colors: COLORS.mauve,
       columns: [
         { id: 'MONO_OND_3KW', label: 'OND 3KW', width: 90 },
         { id: 'MONO_OND_6KW', label: 'OND 6KW', width: 90 },
@@ -339,6 +356,7 @@ export const BTOB_COLUMNS = {
     },
     {
       name: 'Triphase',
+      colors: COLORS.gris,
       columns: [
         { id: 'TRI_OND_3KW', label: 'OND 3 KW', width: 90 },
         { id: 'TRI_OND_6KW', label: 'OND 6 KW', width: 90 },
@@ -347,6 +365,38 @@ export const BTOB_COLUMNS = {
       ],
     },
   ],
+}
+
+// Convert a 0-based column index to a letter (0=A, 1=B, ..., 25=Z, 26=AA)
+function getColumnLetter(index) {
+  let letter = ''
+  let num = index
+  while (num >= 0) {
+    letter = String.fromCharCode((num % 26) + 65) + letter
+    num = Math.floor(num / 26) - 1
+  }
+  return letter
+}
+
+// Build a map from column ID to column letter for a given sheet
+export function getColumnIdToLetterMap(sheetId) {
+  const config = getSheetColumns(sheetId)
+  const map = {}
+  let index = 0
+
+  config.frozen.forEach(col => {
+    map[col.id] = getColumnLetter(index)
+    index++
+  })
+
+  config.groups.forEach(group => {
+    group.columns.forEach(col => {
+      map[col.id] = getColumnLetter(index)
+      index++
+    })
+  })
+
+  return map
 }
 
 // Get columns config for a sheet

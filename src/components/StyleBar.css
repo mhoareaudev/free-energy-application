@@ -83,6 +83,11 @@
   color: #90EE90;
 }
 
+.stylebar-btn.save-btn.error {
+  background: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
 .stylebar-btn.save-btn .spinning {
   animation: spin 1s linear infinite;
 }

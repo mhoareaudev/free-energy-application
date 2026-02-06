@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Undo2,
   Redo2,
@@ -41,6 +41,7 @@ export default function StyleBar() {
   const { userProfile } = useAuth()
 
   const [justSaved, setJustSaved] = useState(false)
+  const [saveError, setSaveError] = useState(false)
 
   const [selectedFont, setSelectedFont] = useState('Arial')
   const [selectedSize, setSelectedSize] = useState(12)
@@ -81,6 +82,19 @@ export default function StyleBar() {
     const n = nom ? nom.charAt(0).toUpperCase() : ''
     return p + n || '?'
   }
+
+  const handleSave = useCallback(async () => {
+    if (saving || !hasUnsavedChanges) return
+    setSaveError(false)
+    const success = await saveData()
+    if (success) {
+      setJustSaved(true)
+      setTimeout(() => setJustSaved(false), 2000)
+    } else {
+      setSaveError(true)
+      setTimeout(() => setSaveError(false), 3000)
+    }
+  }, [saving, hasUnsavedChanges, saveData])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -126,15 +140,7 @@ export default function StyleBar() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [undo, redo, copyCells, cutCells, pasteCells])
-
-  const handleSave = async () => {
-    const success = await saveData()
-    if (success) {
-      setJustSaved(true)
-      setTimeout(() => setJustSaved(false), 2000)
-    }
-  }
+  }, [undo, redo, handleSave, copyCells, cutCells, pasteCells])
 
   const handleFontChange = (font) => {
     setSelectedFont(font)
@@ -201,7 +207,7 @@ export default function StyleBar() {
       {/* Save Group */}
       <div className="stylebar-group">
         <button
-          className={`stylebar-btn save-btn ${hasUnsavedChanges ? 'unsaved' : ''} ${justSaved ? 'saved' : ''}`}
+          className={`stylebar-btn save-btn ${hasUnsavedChanges ? 'unsaved' : ''} ${justSaved ? 'saved' : ''} ${saveError ? 'error' : ''}`}
           onClick={handleSave}
           disabled={saving || !hasUnsavedChanges}
           title="Sauvegarder (Ctrl+S)"
@@ -210,6 +216,11 @@ export default function StyleBar() {
             <>
               <Loader2 size={16} className="spinning" />
               <span className="save-text">Sauvegarde...</span>
+            </>
+          ) : saveError ? (
+            <>
+              <Save size={16} />
+              <span className="save-text">Erreur !</span>
             </>
           ) : justSaved ? (
             <>

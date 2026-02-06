@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseUrl, supabaseAnonKey } from '../lib/supabase'
+import { getColumnIdToLetterMap } from '../data/sheetsConfig'
 import { useAuth } from './AuthContext'
 
 const SpreadsheetContext = createContext({})
@@ -26,8 +27,20 @@ export const SpreadsheetProvider = ({ children }) => {
   // Online users (just for showing who's connected)
   const [onlineUsers, setOnlineUsers] = useState([])
 
-  // Ref to track if update came from realtime (to avoid loops)
-  const isRealtimeUpdateRef = useRef(false)
+  // VT form data stored per row (sheetId:row -> form data) for PDF generation
+  const [vtFormData, setVtFormData] = useState({})
+
+  // Ref to prevent concurrent saves
+  const savingRef = useRef(false)
+
+  // Timestamp of last successful save (to ignore realtime echoes)
+  const lastSaveTimeRef = useRef(0)
+
+  // Ref for pending cell edit (value being typed but not yet committed)
+  const pendingEditRef = useRef(null)
+
+  // Cached auth token (so save never calls supabase.auth.getSession which can hang)
+  const tokenRef = useRef(null)
 
   // History for undo/redo
   const historyRef = useRef([])
@@ -67,6 +80,17 @@ export const SpreadsheetProvider = ({ children }) => {
     loadSheets()
   }, [])
 
+  // Cache auth token so save path never needs to call supabase.auth.getSession()
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      tokenRef.current = session?.access_token || null
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      tokenRef.current = session?.access_token || null
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
   // Subscribe to Supabase Realtime for live updates
   useEffect(() => {
     const channel = supabase
@@ -84,8 +108,11 @@ export const SpreadsheetProvider = ({ children }) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const { sheet_id, data, styles } = payload.new
 
-            // Mark this as a realtime update to avoid triggering unsaved changes
-            isRealtimeUpdateRef.current = true
+            // Ignore echoes: during active save OR within 3s after save
+            if (savingRef.current || (Date.now() - lastSaveTimeRef.current < 3000)) {
+              console.log('Ignoring realtime echo (save in progress or recent)')
+              return
+            }
 
             setSheets(prev => ({
               ...prev,
@@ -94,11 +121,6 @@ export const SpreadsheetProvider = ({ children }) => {
                 styles: styles || {},
               }
             }))
-
-            // Reset the flag after state update
-            setTimeout(() => {
-              isRealtimeUpdateRef.current = false
-            }, 100)
           }
         }
       )
@@ -160,57 +182,167 @@ export const SpreadsheetProvider = ({ children }) => {
     }
   }, [user, userProfile])
 
-  // Track unsaved changes (but not from realtime updates)
-  useEffect(() => {
-    if (!loading && !isRealtimeUpdateRef.current) {
-      setHasUnsavedChanges(true)
-    }
-  }, [sheets, loading])
-
   // Ref to always have current sheets value for saving
   const sheetsRef = useRef(sheets)
   useEffect(() => {
     sheetsRef.current = sheets
   }, [sheets])
 
-  // Save all sheets to Supabase
+  // When tab becomes visible again, ensure clean state and warm up connection
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // If savingRef got stuck somehow, reset it
+        if (savingRef.current) {
+          console.log('Tab visible: resetting stuck savingRef')
+          savingRef.current = false
+          setSaving(false)
+        }
+        // Warm up the connection so next save doesn't hang
+        fetch(`${supabaseUrl}/rest/v1/sheets?select=sheet_id&limit=1`, {
+          headers: { 'apikey': supabaseAnonKey },
+        }).then(() => {
+          console.log('Connection warmed up after tab switch')
+        }).catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
+  // Warn user before closing tab with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [hasUnsavedChanges])
+
+  // Register a pending edit (called by Spreadsheet when user is typing in a cell)
+  const setPendingEdit = useCallback((sheetId, cellId, value) => {
+    if (sheetId && cellId) {
+      pendingEditRef.current = { sheetId, cellId, value }
+    } else {
+      pendingEditRef.current = null
+    }
+  }, [])
+
+  // Upsert a single sheet using raw fetch (bypasses Supabase client which can hang after tab switch)
+  const upsertSheet = async (sheetId, sheetData, timeoutMs) => {
+    // Use cached token (never calls supabase client during save)
+    const token = tokenRef.current || supabaseAnonKey
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/sheets?on_conflict=sheet_id`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${token}`,
+          'Prefer': 'resolution=merge-duplicates,return=minimal',
+        },
+        body: JSON.stringify({
+          sheet_id: sheetId,
+          data: sheetData.cells || {},
+          styles: sheetData.styles || {},
+          updated_at: new Date().toISOString(),
+        }),
+        signal: controller.signal,
+      })
+      clearTimeout(timer)
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`HTTP ${response.status}: ${text}`)
+      }
+    } catch (err) {
+      clearTimeout(timer)
+      throw err
+    }
+  }
+
+  // Save all sheets to Supabase (with 1 automatic retry on failure)
   const saveAllSheets = useCallback(async () => {
+    // Prevent concurrent saves
+    if (savingRef.current) {
+      console.log('Save already in progress, skipping')
+      return false
+    }
+
+    // Commit any pending cell edit before saving
+    const pendingEdit = pendingEditRef.current
+    if (pendingEdit) {
+      const { sheetId, cellId, value } = pendingEdit
+      setSheets(prev => ({
+        ...prev,
+        [sheetId]: {
+          ...prev[sheetId],
+          cells: {
+            ...prev[sheetId]?.cells,
+            [cellId]: value,
+          }
+        }
+      }))
+      sheetsRef.current = {
+        ...sheetsRef.current,
+        [sheetId]: {
+          ...sheetsRef.current[sheetId],
+          cells: {
+            ...sheetsRef.current[sheetId]?.cells,
+            [cellId]: value,
+          }
+        }
+      }
+      pendingEditRef.current = null
+    }
+
     const currentSheets = sheetsRef.current
     if (Object.keys(currentSheets).length === 0) {
       console.log('No sheets to save')
       return false
     }
 
+    savingRef.current = true
     setSaving(true)
-    try {
-      console.log('Saving sheets:', Object.keys(currentSheets))
-      const promises = Object.entries(currentSheets).map(async ([sheetId, sheetData]) => {
-        const { error } = await supabase
-          .from('sheets')
-          .upsert({
-            sheet_id: sheetId,
-            data: sheetData.cells || {},
-            styles: sheetData.styles || {},
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'sheet_id'
-          })
 
-        if (error) {
-          console.error(`Error saving sheet ${sheetId}:`, error)
-          throw error
-        }
-      })
-
+    const doSave = async (attempt) => {
+      console.log(`Saving sheets (attempt ${attempt}):`, Object.keys(currentSheets))
+      const promises = Object.entries(currentSheets).map(([sheetId, sheetData]) =>
+        upsertSheet(sheetId, sheetData, 8000)
+      )
       await Promise.all(promises)
+    }
+
+    try {
+      await doSave(1)
       console.log('Save successful')
+      lastSaveTimeRef.current = Date.now()
       setLastSaved(new Date())
       setHasUnsavedChanges(false)
       return true
-    } catch (err) {
-      console.error('Error saving sheets:', err)
-      return false
+    } catch (firstErr) {
+      console.warn('First save attempt failed, retrying...', firstErr.message)
+      // Brief pause before retrying with a fresh connection
+      await new Promise(r => setTimeout(r, 500))
+      try {
+        await doSave(2)
+        console.log('Save successful on retry')
+        lastSaveTimeRef.current = Date.now()
+        setLastSaved(new Date())
+        setHasUnsavedChanges(false)
+        return true
+      } catch (retryErr) {
+        console.error('Save failed after retry:', retryErr.message)
+        return false
+      }
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }, [])
@@ -287,6 +419,7 @@ export const SpreadsheetProvider = ({ children }) => {
   // Set cell value
   const setCellValue = useCallback((sheetId, cellId, value) => {
     saveToHistory()
+    setHasUnsavedChanges(true)
     setSheets(prev => ({
       ...prev,
       [sheetId]: {
@@ -302,6 +435,7 @@ export const SpreadsheetProvider = ({ children }) => {
   // Set cell style
   const setCellStyle = useCallback((sheetId, cellId, style) => {
     saveToHistory()
+    setHasUnsavedChanges(true)
     setSheets(prev => ({
       ...prev,
       [sheetId]: {
@@ -322,6 +456,7 @@ export const SpreadsheetProvider = ({ children }) => {
     if (selectedCells.length === 0) return
 
     saveToHistory()
+    setHasUnsavedChanges(true)
     setSheets(prev => {
       const newStyles = { ...prev[activeSheet]?.styles }
       selectedCells.forEach(cellId => {
@@ -367,6 +502,7 @@ export const SpreadsheetProvider = ({ children }) => {
 
     // Clear original cells
     saveToHistory()
+    setHasUnsavedChanges(true)
     setSheets(prev => {
       const newCells = { ...prev[activeSheet]?.cells }
       const newStyles = { ...prev[activeSheet]?.styles }
@@ -398,6 +534,7 @@ export const SpreadsheetProvider = ({ children }) => {
     const rowOffset = targetRow - sourceRow
 
     saveToHistory()
+    setHasUnsavedChanges(true)
     setSheets(prev => {
       const newCells = { ...prev[activeSheet]?.cells }
       const newStyles = { ...prev[activeSheet]?.styles }
@@ -428,6 +565,7 @@ export const SpreadsheetProvider = ({ children }) => {
     if (selectedCells.length === 0) return
 
     saveToHistory()
+    setHasUnsavedChanges(true)
     setSheets(prev => {
       const newCells = { ...prev[activeSheet]?.cells }
       selectedCells.forEach(cellId => {
@@ -446,6 +584,7 @@ export const SpreadsheetProvider = ({ children }) => {
   // Insert row
   const insertRow = useCallback((afterRow, sheetId = activeSheet) => {
     saveToHistory()
+    setHasUnsavedChanges(true)
     setSheets(prev => {
       const sheet = prev[sheetId]
       if (!sheet) return prev
@@ -485,6 +624,7 @@ export const SpreadsheetProvider = ({ children }) => {
   // Delete row
   const deleteRow = useCallback((row, sheetId = activeSheet) => {
     saveToHistory()
+    setHasUnsavedChanges(true)
     setSheets(prev => {
       const sheet = prev[sheetId]
       if (!sheet) return prev
@@ -524,6 +664,7 @@ export const SpreadsheetProvider = ({ children }) => {
   // Insert column
   const insertColumn = useCallback((afterCol, sheetId = activeSheet) => {
     saveToHistory()
+    setHasUnsavedChanges(true)
     setSheets(prev => {
       const sheet = prev[sheetId]
       if (!sheet) return prev
@@ -566,6 +707,7 @@ export const SpreadsheetProvider = ({ children }) => {
   // Delete column
   const deleteColumn = useCallback((col, sheetId = activeSheet) => {
     saveToHistory()
+    setHasUnsavedChanges(true)
     setSheets(prev => {
       const sheet = prev[sheetId]
       if (!sheet) return prev
@@ -650,6 +792,7 @@ export const SpreadsheetProvider = ({ children }) => {
       const rows = text.split(/\r?\n/).filter(row => row.length > 0)
 
       saveToHistory()
+      setHasUnsavedChanges(true)
       setSheets(prev => {
         const newCells = { ...prev[activeSheet]?.cells }
 
@@ -702,16 +845,40 @@ export const SpreadsheetProvider = ({ children }) => {
     }
 
     saveToHistory()
+    setHasUnsavedChanges(true)
+
+    const colMap = getColumnIdToLetterMap(sheetId)
 
     setSheets(prev => {
       const currentSheet = prev[sheetId] || { cells: {}, styles: {} }
       const newCells = { ...currentSheet.cells }
 
-      // A = COMMERCIAL
-      newCells[`A${nextRow}`] = data.commercial
+      // Helper to set a cell by column ID
+      const setCell = (colId, value) => {
+        if (value && colMap[colId]) {
+          newCells[`${colMap[colId]}${nextRow}`] = value
+        }
+      }
 
-      // C = Client name
-      newCells[`C${nextRow}`] = data.clientName
+      // Commercial name (frozen col A)
+      setCell('COMMERCIAL', data.commercial)
+
+      // Client name (frozen col C - Colonne1 or NOM_PRENOM depending on sheet)
+      const clientCol = sheetId === 'btoc-comptant' ? 'Colonne1' : 'NOM_PRENOM'
+      setCell(clientCol, data.clientName)
+
+      // Additional fields from VT form
+      if (data.vtFormData) {
+        setCell('ADRESSE_INSTALLATION', data.vtFormData.adresse)
+        setCell('VILLE', data.vtFormData.commune)
+        setCell('CODE_POSTAL', data.vtFormData.codePostal)
+        setCell('TELEPHONE', data.vtFormData.tel)
+        setCell('EMAIL', data.vtFormData.email)
+        setCell('DATE_DDE_VT', data.dateDemandeVT)
+
+        // Persist full VT form data for PDF generation (survives page reload)
+        newCells[`__vtFormData:${nextRow}`] = JSON.stringify(data.vtFormData)
+      }
 
       return {
         ...prev,
@@ -721,6 +888,14 @@ export const SpreadsheetProvider = ({ children }) => {
         }
       }
     })
+
+    // Also keep in memory for immediate use before save
+    if (data.vtFormData) {
+      setVtFormData(prev => ({
+        ...prev,
+        [`${sheetId}:${nextRow}`]: data.vtFormData,
+      }))
+    }
 
     // Switch to the target sheet
     setActiveSheet(sheetId)
@@ -760,11 +935,13 @@ export const SpreadsheetProvider = ({ children }) => {
     getRowHeight,
     pasteFromClipboard,
     addVTRequest,
+    vtFormData,
     loading,
     saving,
     lastSaved,
     hasUnsavedChanges,
     onlineUsers,
+    setPendingEdit,
   }
 
   return (

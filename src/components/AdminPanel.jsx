@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { X, Plus, Trash2, Upload, User, Edit2, XCircle, Users, Briefcase, Save } from 'lucide-react'
+import { X, Plus, Trash2, Upload, User, Edit2, XCircle, Users, Briefcase, Save, Shield } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { ROLES, useAuth } from '../context/AuthContext'
+import { SHEETS, getSheetColumns } from '../data/sheetsConfig'
 import './AdminPanel.css'
 
 export default function AdminPanel({ isOpen, onClose }) {
@@ -25,6 +26,9 @@ export default function AdminPanel({ isOpen, onClose }) {
     nom: '',
     prenom: '',
   })
+  const [roleVisibility, setRoleVisibility] = useState({})
+  const [loadingRoles, setLoadingRoles] = useState(false)
+  const [activeRoleTab, setActiveRoleTab] = useState('administratif')
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
 
@@ -33,8 +37,10 @@ export default function AdminPanel({ isOpen, onClose }) {
     if (isOpen) {
       if (activeTab === 'profiles') {
         fetchProfiles()
-      } else {
+      } else if (activeTab === 'commerciaux') {
         fetchCommerciaux()
+      } else if (activeTab === 'roles') {
+        fetchRoleVisibility()
       }
     }
   }, [isOpen, activeTab])
@@ -75,6 +81,69 @@ export default function AdminPanel({ isOpen, onClose }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchRoleVisibility = async () => {
+    setLoadingRoles(true)
+    setError(null)
+    try {
+      const { data, error } = await supabase
+        .from('role_visibility')
+        .select('*')
+
+      if (error) throw error
+
+      const visibility = {}
+      ;(data || []).forEach(row => {
+        visibility[row.role] = row.hidden_groups || {}
+      })
+      setRoleVisibility(visibility)
+    } catch (err) {
+      console.error('Error fetching role visibility:', err)
+      setError('Erreur lors du chargement de la visibilité des rôles.')
+    } finally {
+      setLoadingRoles(false)
+    }
+  }
+
+  const toggleGroupVisibility = async (role, sheetId, groupName) => {
+    setError(null)
+    const currentHidden = roleVisibility[role] || {}
+    const sheetHidden = currentHidden[sheetId] || []
+
+    let newSheetHidden
+    if (sheetHidden.includes(groupName)) {
+      newSheetHidden = sheetHidden.filter(g => g !== groupName)
+    } else {
+      newSheetHidden = [...sheetHidden, groupName]
+    }
+
+    const newHidden = { ...currentHidden, [sheetId]: newSheetHidden }
+
+    // Optimistic update
+    setRoleVisibility(prev => ({ ...prev, [role]: newHidden }))
+
+    try {
+      const { error } = await supabase
+        .from('role_visibility')
+        .upsert({
+          role,
+          hidden_groups: newHidden,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'role' })
+
+      if (error) throw error
+    } catch (err) {
+      console.error('Error updating role visibility:', err)
+      setError('Erreur lors de la mise à jour.')
+      // Revert optimistic update
+      fetchRoleVisibility()
+    }
+  }
+
+  const isGroupVisible = (role, sheetId, groupName) => {
+    const hidden = roleVisibility[role]?.[sheetId] || []
+    return !hidden.includes(groupName)
   }
 
   const handleUpdateRole = async (profileId, newRole) => {
@@ -303,6 +372,13 @@ export default function AdminPanel({ isOpen, onClose }) {
           >
             <Briefcase size={16} />
             Commerciaux
+          </button>
+          <button
+            className={`admin-tab ${activeTab === 'roles' ? 'active' : ''}`}
+            onClick={() => setActiveTab('roles')}
+          >
+            <Shield size={16} />
+            Rôles
           </button>
         </div>
 
@@ -629,6 +705,63 @@ export default function AdminPanel({ isOpen, onClose }) {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Rôles Tab */}
+        {activeTab === 'roles' && (
+          <>
+            <div className="role-subtabs">
+              <button
+                className={`role-subtab ${activeRoleTab === 'administratif' ? 'active' : ''}`}
+                onClick={() => setActiveRoleTab('administratif')}
+              >
+                <span className="role-badge-header administratif">Administratif</span>
+              </button>
+              <button
+                className={`role-subtab ${activeRoleTab === 'technique' ? 'active' : ''}`}
+                onClick={() => setActiveRoleTab('technique')}
+              >
+                <span className="role-badge-header technique">Technique</span>
+              </button>
+              <button
+                className={`role-subtab ${activeRoleTab === 'commercial' ? 'active' : ''}`}
+                onClick={() => setActiveRoleTab('commercial')}
+              >
+                <span className="role-badge-header commercial">Commercial</span>
+              </button>
+            </div>
+            <div className="roles-container">
+              <p className="list-hint">Configurez les groupes de colonnes visibles pour ce rôle. Les administrateurs et commerciaux voient toutes les colonnes.</p>
+              {loadingRoles ? (
+                <div className="loading">Chargement...</div>
+              ) : (
+                SHEETS.map(sheet => {
+                  const config = getSheetColumns(sheet.id)
+                  return (
+                    <div key={sheet.id} className="sheet-subsection">
+                      <div className="sheet-subsection-title">{sheet.name}</div>
+                      {config.groups.map(group => (
+                        <div key={group.name} className="group-toggle-row">
+                          <div className="group-toggle-info">
+                            <span
+                              className="group-color-dot"
+                              style={{ backgroundColor: group.colors.border }}
+                            />
+                            <span className="group-toggle-name">{group.name}</span>
+                          </div>
+                          <button
+                            className={`toggle-switch ${isGroupVisible(activeRoleTab, sheet.id, group.name) ? 'active' : ''}`}
+                            onClick={() => toggleGroupVisibility(activeRoleTab, sheet.id, group.name)}
+                            title={isGroupVisible(activeRoleTab, sheet.id, group.name) ? 'Visible' : 'Masqué'}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })
               )}
             </div>
           </>
