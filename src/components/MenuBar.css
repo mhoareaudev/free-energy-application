@@ -1,0 +1,96 @@
+.menubar {
+  height: var(--menubar-height);
+  min-height: var(--menubar-height);
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: stretch;
+  padding: 0 var(--spacing-sm);
+  gap: 0;
+}
+
+.menubar-item {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.menubar-btn {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--spacing-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.menubar-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.menubar-btn.active {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.menubar-btn.active-tab {
+  color: var(--primary-600);
+  font-weight: 600;
+  border-bottom: 2px solid var(--primary-600);
+}
+
+/* Dropdown (rendered as portal at body level) */
+.menubar-dropdown {
+  min-width: 180px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  z-index: 9999;
+  overflow: hidden;
+  animation: menuSlideIn 0.12s ease-out;
+  padding: 4px;
+}
+
+@keyframes menuSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.menubar-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: 8px 12px;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.menubar-dropdown-item:hover {
+  background: var(--bg-secondary);
+}
+
+.menubar-dropdown-item svg {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.menubar-dropdown-item:hover svg {
+  color: var(--text-secondary);
+}

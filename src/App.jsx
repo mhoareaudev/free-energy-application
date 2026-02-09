@@ -3,7 +3,9 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { SpreadsheetProvider } from './context/SpreadsheetContext'
 import { NotificationProvider } from './context/NotificationContext'
 import TopBar from './components/TopBar'
+import MenuBar from './components/MenuBar'
 import StyleBar from './components/StyleBar'
+import FormulaBar from './components/FormulaBar'
 import Spreadsheet from './components/Spreadsheet'
 import SheetTabs from './components/SheetTabs'
 import VTRequestModal from './components/VTRequestModal'
@@ -38,7 +40,9 @@ function AppContent() {
           onRequestVT={() => setShowVTModal(true)}
           onOpenAdmin={() => setShowAdminPanel(true)}
         />
+        <MenuBar />
         <StyleBar />
+        <FormulaBar />
         <Spreadsheet />
         <SheetTabs />
 

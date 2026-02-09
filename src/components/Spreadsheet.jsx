@@ -33,11 +33,15 @@ export default function Spreadsheet() {
     pasteFromClipboard,
     setPendingEdit,
     vtFormData,
+    setDataToDisplayLetterMap,
   } = useSpreadsheet()
 
   const containerRef = useRef(null)
   const scrollableRef = useRef(null)
   const scrollRAF = useRef(null)
+  const headerScrollRef1 = useRef(null)
+  const headerScrollRef2 = useRef(null)
+  const headerScrollRef3 = useRef(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
   const [containerHeight, setContainerHeight] = useState(0)
@@ -58,6 +62,13 @@ export default function Spreadsheet() {
   const columnFilterRef = useRef(null)
   const filterBtnRef = useRef(null)
 
+  // Column filter (COMMERCIAL)
+  const [commercialFilter, setCommercialFilter] = useState(null)
+  const [showCommercialFilter, setShowCommercialFilter] = useState(false)
+  const [commercialFilterDropdownPos, setCommercialFilterDropdownPos] = useState(null)
+  const commercialFilterRef = useRef(null)
+  const commercialFilterBtnRef = useRef(null)
+
   // Cell dropdown position (for portal rendering)
   const [cellDropdownPos, setCellDropdownPos] = useState(null) // { top, left, width }
 
@@ -71,6 +82,9 @@ export default function Spreadsheet() {
 
   // Techniciens list for CHARGES_AFFAIRES dropdown
   const [techniciens, setTechniciens] = useState([])
+
+  // Commerciaux list for COMMERCIAL column filter
+  const [commerciaux, setCommerciaux] = useState([])
 
   useEffect(() => {
     const fetchTechniciens = async () => {
@@ -86,6 +100,22 @@ export default function Spreadsheet() {
       }
     }
     fetchTechniciens()
+  }, [])
+
+  useEffect(() => {
+    const fetchCommerciaux = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, nom, prenom')
+          .eq('role', 'commercial')
+          .order('nom')
+        if (!error && data) setCommerciaux(data)
+      } catch (err) {
+        console.error('Error fetching commerciaux:', err)
+      }
+    }
+    fetchCommerciaux()
   }, [])
 
   // Fetch role-based hidden groups for current user
@@ -119,6 +149,10 @@ export default function Spreadsheet() {
     const cols = []
     let position = ROW_NUMBER_WIDTH + ACTION_COL_WIDTH // Start after row number + action column
 
+    // Full config letter mapping (stable regardless of hidden groups)
+    // This ensures data is always read/written at the correct cell position
+    const fullLetterMap = getColumnIdToLetterMap(activeSheet)
+
     // Frozen columns
     columnsConfig.frozen.forEach((col, index) => {
       const customWidth = getColumnWidth(activeSheet, index, col.width)
@@ -130,6 +164,7 @@ export default function Spreadsheet() {
         defaultWidth: col.width,
         isFrozen: true,
         letter: String.fromCharCode(65 + index),
+        dataLetter: fullLetterMap[col.id],
       })
       position += customWidth
     })
@@ -157,6 +192,7 @@ export default function Spreadsheet() {
           groupColors: group.colors,
           isGroupStart: colIdx === 0,
           letter: getColumnLetter(index),
+          dataLetter: fullLetterMap[col.id],
         })
         position += customWidth
       })
@@ -165,15 +201,24 @@ export default function Spreadsheet() {
     return { columns: cols, frozenWidth, totalWidth: position }
   }, [columnsConfig, activeSheet, getColumnWidth, roleHiddenGroups])
 
+  // Update dataLetter → displayLetter mapping for FormulaBar
+  useEffect(() => {
+    const map = {}
+    allColumns.columns.forEach((col) => {
+      if (col.dataLetter) map[col.dataLetter] = col.letter
+    })
+    setDataToDisplayLetterMap(map)
+  }, [allColumns, setDataToDisplayLetterMap])
+
   // Memoize frozen and non-frozen columns
   const frozenCols = useMemo(() => allColumns.columns.filter((col) => col.isFrozen), [allColumns.columns])
   const nonFrozenCols = useMemo(() => allColumns.columns.filter((col) => !col.isFrozen), [allColumns.columns])
 
-  // Reverse map: column letter → column ID (e.g. 'AN' → 'CHARGES_AFFAIRES')
+  // Reverse map: data letter → column ID (e.g. 'AN' → 'CHARGES_AFFAIRES')
   const letterToColId = useMemo(() => {
     const map = {}
     allColumns.columns.forEach(col => {
-      map[col.letter] = col.id
+      map[col.dataLetter] = col.id
     })
     return map
   }, [allColumns.columns])
@@ -187,10 +232,16 @@ export default function Spreadsheet() {
     return DROPDOWN_COLUMNS.has(letterToColId[match[1]])
   }, [letterToColId])
 
-  // CHARGES_AFFAIRES column letter for the current sheet
+  // CHARGES_AFFAIRES data letter for the current sheet (stable across views)
   const chargesAffairesLetter = useMemo(() => {
     const col = allColumns.columns.find(c => c.id === 'CHARGES_AFFAIRES')
-    return col?.letter || null
+    return col?.dataLetter || null
+  }, [allColumns.columns])
+
+  // COMMERCIAL data letter for the current sheet
+  const commercialDataLetter = useMemo(() => {
+    const col = allColumns.columns.find(c => c.id === 'COMMERCIAL')
+    return col?.dataLetter || null
   }, [allColumns.columns])
 
   // Unique non-empty values in CHARGES_AFFAIRES for filter options
@@ -204,19 +255,44 @@ export default function Spreadsheet() {
     return Array.from(values).sort((a, b) => a.localeCompare(b, 'fr'))
   }, [chargesAffairesLetter, activeSheet, getCellValue])
 
+  // Unique non-empty values in COMMERCIAL for filter options
+  const uniqueCommercials = useMemo(() => {
+    if (!commercialDataLetter) return []
+    const values = new Set()
+    for (let row = 1; row <= TOTAL_ROWS; row++) {
+      const val = getCellValue(activeSheet, `${commercialDataLetter}${row}`)
+      if (val) values.add(val)
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b, 'fr'))
+  }, [commercialDataLetter, activeSheet, getCellValue])
+
   // Filtered row indices (0-based). When no filter, all rows are included.
+  // Supports both CHARGES_AFFAIRES and COMMERCIAL filters simultaneously.
   const filteredRowIndices = useMemo(() => {
-    if (!columnFilter || !chargesAffairesLetter) return null // null = no filter
+    const hasChargesFilter = columnFilter && chargesAffairesLetter
+    const hasCommercialFilter = commercialFilter && commercialDataLetter
+
+    if (!hasChargesFilter && !hasCommercialFilter) return null // null = no filter
+
     const indices = []
     for (let rowIndex = 0; rowIndex < TOTAL_ROWS; rowIndex++) {
       const rowNumber = rowIndex + 1
-      const val = getCellValue(activeSheet, `${chargesAffairesLetter}${rowNumber}`)
-      if (val === columnFilter) {
-        indices.push(rowIndex)
+      let matches = true
+
+      if (hasChargesFilter) {
+        const val = getCellValue(activeSheet, `${chargesAffairesLetter}${rowNumber}`)
+        if (val !== columnFilter) matches = false
       }
+
+      if (hasCommercialFilter && matches) {
+        const val = getCellValue(activeSheet, `${commercialDataLetter}${rowNumber}`)
+        if (val !== commercialFilter) matches = false
+      }
+
+      if (matches) indices.push(rowIndex)
     }
     return indices
-  }, [columnFilter, chargesAffairesLetter, activeSheet, getCellValue])
+  }, [columnFilter, chargesAffairesLetter, commercialFilter, commercialDataLetter, activeSheet, getCellValue])
 
   const totalDisplayedRows = filteredRowIndices ? filteredRowIndices.length : TOTAL_ROWS
 
@@ -234,6 +310,20 @@ export default function Spreadsheet() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [showColumnFilter])
 
+  // Close commercial filter dropdown on outside click
+  useEffect(() => {
+    if (!showCommercialFilter) return
+    const handleClick = (e) => {
+      const inDropdown = commercialFilterRef.current && commercialFilterRef.current.contains(e.target)
+      const inButton = commercialFilterBtnRef.current && commercialFilterBtnRef.current.contains(e.target)
+      if (!inDropdown && !inButton) {
+        setShowCommercialFilter(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showCommercialFilter])
+
   // Close cell dropdown on outside click
   useEffect(() => {
     if (!editingCell || !cellDropdownPos || !isDropdownCell(editingCell)) return
@@ -250,21 +340,47 @@ export default function Spreadsheet() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [editingCell, cellDropdownPos, isDropdownCell, setEditingCell])
 
-  // Reset filter when sheet changes
+  // Reset filters when sheet changes
   useEffect(() => {
     setColumnFilter(null)
     setShowColumnFilter(false)
+    setCommercialFilter(null)
+    setShowCommercialFilter(false)
   }, [activeSheet])
 
-  // Calculate visible rows
+  // Pre-compute cumulative row positions (accounts for custom row heights)
+  const rowLayout = useMemo(() => {
+    const positions = new Array(totalDisplayedRows + 1)
+    let cumulative = 0
+    for (let d = 0; d < totalDisplayedRows; d++) {
+      positions[d] = cumulative
+      const actualRow = filteredRowIndices ? filteredRowIndices[d] : d
+      cumulative += getRowHeight(activeSheet, actualRow, ROW_HEIGHT)
+    }
+    positions[totalDisplayedRows] = cumulative
+    return { positions, totalHeight: cumulative }
+  }, [totalDisplayedRows, filteredRowIndices, activeSheet, getRowHeight])
+
+  // Calculate visible rows (binary search on cumulative positions)
   const visibleRows = useMemo(() => {
-    const startRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - VISIBLE_BUFFER)
-    const endRow = Math.min(
-      totalDisplayedRows,
-      Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + VISIBLE_BUFFER
-    )
+    const { positions } = rowLayout
+    // Binary search: find first row whose bottom edge > scrollTop
+    let lo = 0, hi = totalDisplayedRows - 1
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (positions[mid + 1] <= scrollTop) lo = mid + 1
+      else hi = mid
+    }
+    const startRow = Math.max(0, lo - VISIBLE_BUFFER)
+
+    // Linear scan from start to find end
+    const viewBottom = scrollTop + containerHeight
+    let end = lo
+    while (end < totalDisplayedRows && positions[end] < viewBottom) end++
+    const endRow = Math.min(totalDisplayedRows, end + VISIBLE_BUFFER)
+
     return { startRow, endRow }
-  }, [scrollTop, containerHeight, totalDisplayedRows])
+  }, [scrollTop, containerHeight, totalDisplayedRows, rowLayout])
 
   // Calculate visible columns (non-frozen)
   const visibleColumns = useMemo(() => {
@@ -296,10 +412,17 @@ export default function Spreadsheet() {
     return () => window.removeEventListener('resize', updateDimensions)
   }, [])
 
-  // Handle scroll with RAF throttling
+  // Handle scroll: apply header transforms synchronously for instant visual feedback,
+  // then defer React state updates (for visible row/column recalculation) to RAF.
   const handleScroll = useCallback((e) => {
     const newScrollTop = e.target.scrollTop
     const newScrollLeft = e.target.scrollLeft
+
+    // Immediate DOM update for header scroll (bypasses React render cycle)
+    const transform = `translate3d(-${newScrollLeft}px, 0, 0)`
+    if (headerScrollRef1.current) headerScrollRef1.current.style.transform = transform
+    if (headerScrollRef2.current) headerScrollRef2.current.style.transform = transform
+    if (headerScrollRef3.current) headerScrollRef3.current.style.transform = transform
 
     if (scrollRAF.current) {
       cancelAnimationFrame(scrollRAF.current)
@@ -311,13 +434,27 @@ export default function Spreadsheet() {
     })
   }, [])
 
-  // Generate cell ID
-  const getCellId = useCallback((colIndex, rowIndex) => {
-    return `${getColumnLetter(colIndex)}${rowIndex + 1}`
-  }, [])
-
   // Set for O(1) lookup of selected cells
   const selectedCellsSet = useMemo(() => new Set(selectedCells), [selectedCells])
+
+  // Pre-computed sets for fast header highlighting (O(1) instead of O(n))
+  const selectedColLetters = useMemo(() => {
+    const set = new Set()
+    selectedCells.forEach(cellId => {
+      const [letter] = parseCellId(cellId)
+      if (letter) set.add(letter)
+    })
+    return set
+  }, [selectedCells])
+
+  const selectedRowNumbers = useMemo(() => {
+    const set = new Set()
+    selectedCells.forEach(cellId => {
+      const [, row] = parseCellId(cellId)
+      if (row) set.add(row)
+    })
+    return set
+  }, [selectedCells])
 
   // Check if cell is selected
   const isCellSelected = useCallback((cellId) => {
@@ -587,20 +724,20 @@ export default function Spreadsheet() {
     setContextMenu(null)
   }, [])
 
-  // Select entire column
-  const selectColumn = useCallback((colLetter) => {
+  // Select entire column (uses dataLetter for consistent cell IDs)
+  const selectColumn = useCallback((dataLetter) => {
     const newSelection = []
     for (let row = 1; row <= TOTAL_ROWS; row++) {
-      newSelection.push(`${colLetter}${row}`)
+      newSelection.push(`${dataLetter}${row}`)
     }
     setSelectedCells(newSelection)
   }, [setSelectedCells])
 
-  // Select entire row
+  // Select entire row (uses dataLetter for consistent cell IDs)
   const selectRow = useCallback((rowNumber) => {
     const newSelection = []
     allColumns.columns.forEach((col) => {
-      newSelection.push(`${col.letter}${rowNumber}`)
+      newSelection.push(`${col.dataLetter}${rowNumber}`)
     })
     setSelectedCells(newSelection)
   }, [allColumns.columns, setSelectedCells])
@@ -686,17 +823,14 @@ export default function Spreadsheet() {
             <div className="header-cell corner-cell" style={{ width: ROW_NUMBER_WIDTH }} />
             <div className="header-cell action-col-header" style={{ width: ACTION_COL_WIDTH }} />
             {frozenCols.map((col) => {
-              const isSelected = selectedCells.some((cellId) => {
-                const [letter] = parseCellId(cellId)
-                return letter === col.letter
-              })
+              const isSelected = selectedColLetters.has(col.dataLetter)
               return (
                 <div
                   key={col.id}
                   className={`header-cell letter-header frozen ${isSelected ? 'selected' : ''}`}
                   style={{ width: col.width }}
-                  onClick={() => selectColumn(col.letter)}
-                  onContextMenu={(e) => handleColumnContextMenu(e, col.letter)}
+                  onClick={() => selectColumn(col.dataLetter)}
+                  onContextMenu={(e) => handleColumnContextMenu(e, col.dataLetter)}
                 >
                   {col.letter}
                   <div
@@ -709,13 +843,10 @@ export default function Spreadsheet() {
           </div>
           <div
             className="scrollable-header-cells"
-            style={{ transform: `translateX(-${scrollLeft}px)` }}
+            ref={headerScrollRef1}
           >
             {visibleNonFrozenCols.map((col) => {
-              const isSelected = selectedCells.some((cellId) => {
-                const [letter] = parseCellId(cellId)
-                return letter === col.letter
-              })
+              const isSelected = selectedColLetters.has(col.dataLetter)
               return (
                 <div
                   key={col.id}
@@ -729,8 +860,8 @@ export default function Spreadsheet() {
                     borderBottom: `1px solid ${col.groupColors?.border || 'var(--border-light)'}`,
                     borderLeft: col.isGroupStart ? `2px solid ${col.groupColors?.border || 'var(--border-medium)'}` : undefined,
                   }}
-                  onClick={() => selectColumn(col.letter)}
-                  onContextMenu={(e) => handleColumnContextMenu(e, col.letter)}
+                  onClick={() => selectColumn(col.dataLetter)}
+                  onContextMenu={(e) => handleColumnContextMenu(e, col.dataLetter)}
                 >
                   {col.letter}
                   <div
@@ -761,7 +892,7 @@ export default function Spreadsheet() {
           </div>
           <div
             className="scrollable-header-cells"
-            style={{ transform: `translateX(-${scrollLeft}px)` }}
+            ref={headerScrollRef2}
           >
             {groups.map((group, index) => (
               <div
@@ -792,30 +923,44 @@ export default function Spreadsheet() {
             <div className="header-cell corner-cell" style={{ width: ROW_NUMBER_WIDTH }} />
             <div className="header-cell action-col-header" style={{ width: ACTION_COL_WIDTH }} title="PDF VT" />
             {frozenCols.map((col) => {
-              const isSelected = selectedCells.some((cellId) => {
-                const [letter] = parseCellId(cellId)
-                return letter === col.letter
-              })
+              const isSelected = selectedColLetters.has(col.dataLetter)
+              const hasFilter = col.id === 'COMMERCIAL'
               return (
                 <div
                   key={col.id}
-                  className={`header-cell column-header frozen ${isSelected ? 'selected' : ''}`}
+                  className={`header-cell column-header frozen ${isSelected ? 'selected' : ''} ${hasFilter ? 'filterable' : ''}`}
                   style={{ width: col.width }}
                 >
-                  {col.label}
+                  <span className="column-header-label">{col.label}</span>
+                  {hasFilter && (
+                    <button
+                      ref={commercialFilterBtnRef}
+                      className={`column-filter-btn ${commercialFilter ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (showCommercialFilter) {
+                          setShowCommercialFilter(false)
+                        } else {
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setCommercialFilterDropdownPos({ top: rect.bottom + 4, left: rect.left })
+                          setShowCommercialFilter(true)
+                        }
+                      }}
+                      title="Filtrer par commercial"
+                    >
+                      <Filter size={12} />
+                    </button>
+                  )}
                 </div>
               )
             })}
           </div>
           <div
             className="scrollable-header-cells"
-            style={{ transform: `translateX(-${scrollLeft}px)` }}
+            ref={headerScrollRef3}
           >
             {visibleNonFrozenCols.map((col) => {
-              const isSelected = selectedCells.some((cellId) => {
-                const [letter] = parseCellId(cellId)
-                return letter === col.letter
-              })
+              const isSelected = selectedColLetters.has(col.dataLetter)
               const hasFilter = col.id === 'CHARGES_AFFAIRES'
               return (
                 <div
@@ -869,10 +1014,7 @@ export default function Spreadsheet() {
       const rowIndex = filteredRowIndices ? filteredRowIndices[displayIndex] : displayIndex
       if (rowIndex === undefined) continue
       const rowNumber = rowIndex + 1
-      const isRowSelected = selectedCells.some((cellId) => {
-        const [, row] = parseCellId(cellId)
-        return row === rowNumber
-      })
+      const isRowSelected = selectedRowNumbers.has(rowNumber)
 
       const rowHeight = getRowHeight(activeSheet, rowIndex, ROW_HEIGHT)
 
@@ -882,7 +1024,7 @@ export default function Spreadsheet() {
           className="spreadsheet-row"
           style={{
             position: 'absolute',
-            top: displayIndex * ROW_HEIGHT,
+            top: rowLayout.positions[displayIndex],
             height: rowHeight,
           }}
         >
@@ -954,7 +1096,7 @@ export default function Spreadsheet() {
             </div>
 
             {frozenCols.map((col) => {
-              const cellId = getCellId(col.index, rowIndex)
+              const cellId = `${col.dataLetter}${rowIndex + 1}`
               const isSelected = isCellSelected(cellId)
               const isEditing = editingCell === cellId
               const value = getCellValue(activeSheet, cellId)
@@ -995,7 +1137,7 @@ export default function Spreadsheet() {
           {/* Scrollable cells */}
           <div className="scrollable-cells">
             {visibleNonFrozenCols.map((col) => {
-              const cellId = getCellId(col.index, rowIndex)
+              const cellId = `${col.dataLetter}${rowIndex + 1}`
               const isSelected = isCellSelected(cellId)
               const isEditing = editingCell === cellId
               const value = getCellValue(activeSheet, cellId)
@@ -1068,7 +1210,7 @@ export default function Spreadsheet() {
         <div
           className="spreadsheet-content"
           style={{
-            height: totalDisplayedRows * ROW_HEIGHT,
+            height: rowLayout.totalHeight,
             width: allColumns.totalWidth,
           }}
         >
@@ -1131,6 +1273,45 @@ export default function Spreadsheet() {
               <button
                 className="column-filter-clear"
                 onClick={() => { setColumnFilter(null); setShowColumnFilter(false) }}
+              >
+                Effacer le filtre
+              </button>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+
+      {/* Commercial filter dropdown portal */}
+      {showCommercialFilter && commercialFilterDropdownPos && createPortal(
+        <div
+          ref={commercialFilterRef}
+          className="column-filter-dropdown"
+          style={{ position: 'fixed', top: commercialFilterDropdownPos.top, left: commercialFilterDropdownPos.left }}
+        >
+          <div className="column-filter-header">Filtrer par commercial</div>
+          <div className="column-filter-options">
+            <button
+              className={`column-filter-option ${!commercialFilter ? 'selected' : ''}`}
+              onClick={() => { setCommercialFilter(null); setShowCommercialFilter(false) }}
+            >
+              Tous
+            </button>
+            {uniqueCommercials.map((name) => (
+              <button
+                key={name}
+                className={`column-filter-option ${commercialFilter === name ? 'selected' : ''}`}
+                onClick={() => { setCommercialFilter(name); setShowCommercialFilter(false) }}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+          {commercialFilter && (
+            <div className="column-filter-footer">
+              <button
+                className="column-filter-clear"
+                onClick={() => { setCommercialFilter(null); setShowCommercialFilter(false) }}
               >
                 Effacer le filtre
               </button>

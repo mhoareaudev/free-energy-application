@@ -17,6 +17,7 @@ export const SpreadsheetProvider = ({ children }) => {
   const [selectedCells, setSelectedCells] = useState([])
   const [editingCell, setEditingCell] = useState(null)
   const [clipboard, setClipboard] = useState({ data: null, type: null })
+  const [dataToDisplayLetterMap, setDataToDisplayLetterMap] = useState({})
   const [columnWidths, setColumnWidths] = useState({})
   const [rowHeights, setRowHeights] = useState({})
   const [loading, setLoading] = useState(true)
@@ -942,6 +943,8 @@ export const SpreadsheetProvider = ({ children }) => {
     hasUnsavedChanges,
     onlineUsers,
     setPendingEdit,
+    dataToDisplayLetterMap,
+    setDataToDisplayLetterMap,
   }
 
   return (

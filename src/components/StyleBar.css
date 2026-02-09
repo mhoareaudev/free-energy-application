@@ -1,8 +1,8 @@
 .stylebar {
   height: var(--toolbar-height);
   min-height: var(--toolbar-height);
-  background: rgb(153, 20, 20);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-light);
   display: flex;
   align-items: center;
   padding: 0 var(--spacing-md);
@@ -25,7 +25,7 @@
 .stylebar-divider {
   width: 1px;
   height: 20px;
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--border-light);
   margin: 0 var(--spacing-xs);
   flex-shrink: 0;
 }
@@ -37,17 +37,17 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
-  color: white;
+  color: var(--text-secondary);
   transition: all var(--transition-fast);
 }
 
 .stylebar-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .stylebar-btn:active:not(:disabled) {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--gray-200);
 }
 
 .stylebar-btn:disabled {
@@ -56,8 +56,8 @@
 }
 
 .stylebar-btn.active {
-  background: rgba(255, 255, 255, 0.25);
-  color: white;
+  background: var(--primary-50);
+  color: var(--primary-600);
 }
 
 /* Save button */
@@ -74,18 +74,19 @@
 }
 
 .stylebar-btn.save-btn.unsaved {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--primary-50);
+  color: var(--primary-600);
   animation: pulse-unsaved 2s ease-in-out infinite;
 }
 
 .stylebar-btn.save-btn.saved {
-  background: rgba(144, 238, 144, 0.3);
-  color: #90EE90;
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
 }
 
 .stylebar-btn.save-btn.error {
-  background: rgba(239, 68, 68, 0.4);
-  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
 }
 
 .stylebar-btn.save-btn .spinning {
@@ -94,10 +95,10 @@
 
 @keyframes pulse-unsaved {
   0%, 100% {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--primary-50);
   }
   50% {
-    background: rgba(255, 255, 255, 0.25);
+    background: var(--primary-100);
   }
 }
 
@@ -128,7 +129,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid rgb(153, 20, 20);
+  border: 2px solid #ffffff;
   margin-left: -6px;
   cursor: default;
   position: relative;
@@ -153,7 +154,7 @@
   height: 8px;
   background: #22c55e;
   border-radius: 50%;
-  border: 2px solid rgb(153, 20, 20);
+  border: 2px solid #ffffff;
 }
 
 .online-user-avatar.current-user {
@@ -162,7 +163,8 @@
 }
 
 .online-user-avatar.more {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--gray-300);
+  color: var(--text-secondary);
   font-size: 10px;
 }
 

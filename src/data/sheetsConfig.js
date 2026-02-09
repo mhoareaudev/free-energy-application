@@ -9,7 +9,7 @@ export const SHEETS = [
   {
     id: 'btoc-abonnement',
     name: 'Suivi activit\u00e9s BtoC \u2013 Abonnement',
-    frozenColumns: ['COMMERCIAL', 'OBJECTIFN', 'NOM - PRENOM CLIENT'],
+    frozenColumns: ['COMMERCIAL', 'OBJECTIF', 'NOM - PRENOM CLIENT'],
   },
   {
     id: 'btob',
@@ -154,7 +154,7 @@ export const BTOC_COMPTANT_COLUMNS = {
 export const BTOC_ABONNEMENT_COLUMNS = {
   frozen: [
     { id: 'COMMERCIAL', label: 'COMMERCIAL', width: 120 },
-    { id: 'OBJECTIFN', label: 'OBJECTIFN', width: 100 },
+    { id: 'OBJECTIF', label: 'OBJECTIF', width: 100 },
     { id: 'NOM_PRENOM', label: 'NOM - PRENOM CLIENT', width: 160 },
   ],
   groups: [

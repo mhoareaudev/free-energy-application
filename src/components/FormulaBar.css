@@ -1,0 +1,149 @@
+.formula-bar {
+  height: 26px;
+  min-height: 26px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-medium);
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+}
+
+.formula-bar.expanded {
+  height: 60px;
+  min-height: 60px;
+}
+
+/* Cell name box */
+.formula-bar-namebox {
+  width: 80px;
+  min-width: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 0 8px;
+  cursor: default;
+  user-select: none;
+}
+
+.formula-bar-name {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-primary);
+  font-family: 'Calibri', 'Segoe UI', sans-serif;
+}
+
+.namebox-chevron {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+/* Separator */
+.formula-bar-separator {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border-medium);
+}
+
+/* Action buttons section */
+.formula-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 2px;
+}
+
+.formula-bar-action-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.formula-bar-action-btn:disabled {
+  color: var(--border-medium);
+  cursor: default;
+}
+
+.formula-bar-action-btn.cancel:not(:disabled):hover {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.formula-bar-action-btn.confirm:not(:disabled):hover {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.08);
+}
+
+/* fx label */
+.formula-bar-fx {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  user-select: none;
+}
+
+.formula-bar-fx span {
+  font-size: 11px;
+  font-weight: 600;
+  font-style: italic;
+  font-family: 'Cambria', 'Times New Roman', serif;
+}
+
+/* Content input */
+.formula-bar-input {
+  flex: 1;
+  height: 100%;
+  border: none;
+  outline: none;
+  padding: 0 6px;
+  font-size: 12px;
+  font-family: 'Calibri', 'Segoe UI', sans-serif;
+  color: var(--text-primary);
+  background: transparent;
+  min-width: 0;
+}
+
+.formula-bar.expanded .formula-bar-input {
+  padding-top: 4px;
+  align-self: flex-start;
+}
+
+.formula-bar-input:focus {
+  background: #fff;
+}
+
+.formula-bar-input:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+/* Expand/collapse button */
+.formula-bar-expand {
+  width: 22px;
+  min-width: 22px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-left: 1px solid var(--border-light);
+  transition: all 0.1s ease;
+}
+
+.formula-bar-expand:hover {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.formula-bar-expand.expanded svg {
+  transform: rotate(180deg);
+}

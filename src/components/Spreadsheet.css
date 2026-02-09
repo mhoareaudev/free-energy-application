@@ -45,7 +45,8 @@
   position: relative;
   height: 100%;
   will-change: transform;
-  transform: translateZ(0);
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
 }
 
 .header-cell {
@@ -298,12 +299,15 @@
   flex: 1;
   overflow: auto;
   position: relative;
+  will-change: scroll-position;
+  -webkit-overflow-scrolling: touch;
 }
 
 .spreadsheet-content {
   position: relative;
   will-change: transform;
-  transform: translateZ(0);
+  transform: translate3d(0, 0, 0);
+  contain: layout style;
 }
 
 /* Rows */
@@ -325,6 +329,7 @@
   flex: 1;
   position: relative;
   height: 100%;
+  contain: layout style;
 }
 
 .row-number {

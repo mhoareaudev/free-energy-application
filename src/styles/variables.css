@@ -87,6 +87,7 @@
 
   /* Layout */
   --topbar-height: 48px;
+  --menubar-height: 32px;
   --toolbar-height: 36px;
   --tabs-height: 32px;
   --frozen-column-bg: #f8f9fa;
