@@ -1,12 +1,40 @@
-.app {
+/* ── Root layout ── */
+.app-layout {
   height: 100vh;
   width: 100%;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-/* Loading state */
+.app-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Dossiers page (spreadsheet stack) ── */
+.dossiers-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  position: relative;
+  z-index: 0; /* stacking context isolé — sidebar (z-index:200) passe toujours dessus */
+}
+
+/* ── Loading state ── */
 .app-loading {
   height: 100vh;
   width: 100%;
@@ -22,18 +50,24 @@
   width: 40px;
   height: 40px;
   border: 3px solid var(--border-light);
-  border-top-color: var(--primary-600);
+  border-top-color: #f97316;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 .app-loading p {
   font-size: var(--font-size-base);
   color: var(--text-secondary);
+}
+
+/* ── Mobile layout ── */
+@media (max-width: 768px) {
+  /* Sidebar is position:fixed on mobile — add bottom space so content isn't hidden */
+  .app-main {
+    padding-bottom: 58px;
+  }
 }

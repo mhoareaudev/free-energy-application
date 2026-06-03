@@ -7,6 +7,11 @@ export const SHEETS = [
     frozenColumns: ['COMMERCIAL', 'OBJECTIF', 'Colonne1'],
   },
   {
+    id: 'btoc-comptant-old',
+    name: 'Suivi activit\u00e9s BtoC \u2013 Comptant (old)',
+    frozenColumns: ['COMMERCIAL', 'OBJECTIF', 'Colonne1'],
+  },
+  {
     id: 'btoc-abonnement',
     name: 'Suivi activit\u00e9s BtoC \u2013 Abonnement',
     frozenColumns: ['COMMERCIAL', 'OBJECTIF', 'NOM - PRENOM CLIENT'],
@@ -110,8 +115,8 @@ export const BTOC_COMPTANT_COLUMNS = {
         { id: 'DATE_PREV_POSE', label: 'DATE PREVISIONNEL DE POSE', width: 190 },
         { id: 'DATE_REELLE_POSE', label: 'DATE REELLE DE POSE', width: 160 },
         { id: 'POSEUR', label: 'POSEUR', width: 100 },
-        { id: 'PHOTOS', label: 'PHOTOS', width: 80 },
-        { id: 'ATTESTATION_ASSURANCE', label: 'ATTESTATION ASSURANCE', width: 170 },
+        { id: 'PHOTOS', label: 'PHOTOS', width: 80, align: 'center' },
+        { id: 'ATTESTATION_ASSURANCE', label: 'ATTESTATION ASSURANCE', width: 170, align: 'center' },
         { id: 'DDE_RACC_EDF', label: 'DDE RACC EDF', width: 120 },
         { id: 'N_SUIVI_EDF', label: 'N\u00b0DE SUIVI EDF', width: 130 },
         { id: 'T0_REVENTE', label: 'T0 REVENTE RECU', width: 140 },
@@ -238,8 +243,8 @@ export const BTOC_ABONNEMENT_COLUMNS = {
         { id: 'DATE_PREV_POSE', label: 'DATE PREVISIONNEL DE POSE', width: 190 },
         { id: 'DATE_REELLE_POSE', label: 'DATE REELLE DE POSE', width: 160 },
         { id: 'POSEUR', label: 'POSEUR', width: 100 },
-        { id: 'PHOTOS', label: 'PHOTOS', width: 80 },
-        { id: 'ATTESTATION_ASSURANCE', label: 'ATTESTATION ASSURANCE', width: 170 },
+        { id: 'PHOTOS', label: 'PHOTOS', width: 80, align: 'center' },
+        { id: 'ATTESTATION_ASSURANCE', label: 'ATTESTATION ASSURANCE', width: 170, align: 'center' },
         { id: 'ELIGIBILITE', label: 'ELIGIBILITE', width: 100 },
         { id: 'DDE_RACC_EDF', label: 'DDE RACC EDF', width: 120 },
         { id: 'N_SUIVI_EDF', label: 'N\u00b0DE SUIVI EDF', width: 130 },
@@ -334,8 +339,8 @@ export const BTOB_COLUMNS = {
         { id: 'RECEPTION_CNO', label: 'RECEPTION CNO', width: 130 },
         { id: 'ETAT_DOSSIER', label: 'ETAT DU DOSSIER', width: 140 },
         { id: 'DATE_POSE', label: 'DATE DE POSE', width: 120 },
-        { id: 'PHOTOS', label: 'PHOTOS', width: 80 },
-        { id: 'ATTESTATION_ASSURANCE', label: 'ATTESTATION ASSURANCE', width: 170 },
+        { id: 'PHOTOS', label: 'PHOTOS', width: 80, align: 'center' },
+        { id: 'ATTESTATION_ASSURANCE', label: 'ATTESTATION ASSURANCE', width: 170, align: 'center' },
         { id: 'DDE_RACC_EDF', label: 'DDE RACC EDF', width: 120 },
         { id: 'N_SUIVI_EDF', label: 'N\u00b0DE SUIVI EDF', width: 130 },
         { id: 'T0_RECU', label: 'T0 RECU', width: 90 },
@@ -403,6 +408,7 @@ export function getColumnIdToLetterMap(sheetId) {
 export const getSheetColumns = (sheetId) => {
   switch (sheetId) {
     case 'btoc-comptant':
+    case 'btoc-comptant-old':
       return BTOC_COMPTANT_COLUMNS
     case 'btoc-abonnement':
       return BTOC_ABONNEMENT_COLUMNS

@@ -1,10 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Undo2,
   Redo2,
-  Save,
-  Loader2,
-  Check,
   Bold,
   Italic,
   Underline,
@@ -17,10 +14,12 @@ import {
   Scissors,
   Copy,
   Clipboard,
+  Upload,
+  ArrowDownNarrowWide,
 } from 'lucide-react'
 import { useSpreadsheet } from '../context/SpreadsheetContext'
-import { useAuth } from '../context/AuthContext'
 import { FONT_FAMILIES, FONT_SIZES, COLOR_PRESETS } from '../data/sheetsConfig'
+import ImportModal from './ImportModal'
 import './StyleBar.css'
 
 export default function StyleBar() {
@@ -29,19 +28,13 @@ export default function StyleBar() {
     applyStyleToSelection,
     undo,
     redo,
-    saveData,
     copyCells,
     cutCells,
     pasteCells,
-    saving,
-    hasUnsavedChanges,
-    onlineUsers,
+    compactRows,
+    activeSheet,
+    saveData,
   } = useSpreadsheet()
-
-  const { userProfile } = useAuth()
-
-  const [justSaved, setJustSaved] = useState(false)
-  const [saveError, setSaveError] = useState(false)
 
   const [selectedFont, setSelectedFont] = useState('Arial')
   const [selectedSize, setSelectedSize] = useState(12)
@@ -49,6 +42,8 @@ export default function StyleBar() {
   const [showSizeDropdown, setShowSizeDropdown] = useState(false)
   const [showHighlightPicker, setShowHighlightPicker] = useState(false)
   const [showTextColorPicker, setShowTextColorPicker] = useState(false)
+  const [showImportModal,  setShowImportModal]  = useState(false)
+  const [compacting,       setCompacting]       = useState(false)
 
   const fontDropdownRef = useRef(null)
   const sizeDropdownRef = useRef(null)
@@ -76,26 +71,6 @@ export default function StyleBar() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Helper to get initials
-  const getInitials = (prenom, nom) => {
-    const p = prenom ? prenom.charAt(0).toUpperCase() : ''
-    const n = nom ? nom.charAt(0).toUpperCase() : ''
-    return p + n || '?'
-  }
-
-  const handleSave = useCallback(async () => {
-    if (saving || !hasUnsavedChanges) return
-    setSaveError(false)
-    const success = await saveData()
-    if (success) {
-      setJustSaved(true)
-      setTimeout(() => setJustSaved(false), 2000)
-    } else {
-      setSaveError(true)
-      setTimeout(() => setSaveError(false), 3000)
-    }
-  }, [saving, hasUnsavedChanges, saveData])
-
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -103,15 +78,7 @@ export default function StyleBar() {
         switch (e.key.toLowerCase()) {
           case 'z':
             e.preventDefault()
-            if (e.shiftKey) {
-              redo()
-            } else {
-              undo()
-            }
-            break
-          case 's':
-            e.preventDefault()
-            handleSave()
+            if (e.shiftKey) { redo() } else { undo() }
             break
           case 'b':
             e.preventDefault()
@@ -133,14 +100,13 @@ export default function StyleBar() {
             e.preventDefault()
             cutCells()
             break
-          // Note: Ctrl+V is handled in Spreadsheet.jsx for external clipboard support
         }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [undo, redo, handleSave, copyCells, cutCells, pasteCells])
+  }, [undo, redo, copyCells, cutCells])
 
   const handleFontChange = (font) => {
     setSelectedFont(font)
@@ -201,71 +167,6 @@ export default function StyleBar() {
           <Redo2 size={16} />
         </button>
       </div>
-
-      <div className="stylebar-divider" />
-
-      {/* Save Group */}
-      <div className="stylebar-group">
-        <button
-          className={`stylebar-btn save-btn ${hasUnsavedChanges ? 'unsaved' : ''} ${justSaved ? 'saved' : ''} ${saveError ? 'error' : ''}`}
-          onClick={handleSave}
-          disabled={saving || !hasUnsavedChanges}
-          title="Sauvegarder (Ctrl+S)"
-        >
-          {saving ? (
-            <>
-              <Loader2 size={16} className="spinning" />
-              <span className="save-text">Sauvegarde...</span>
-            </>
-          ) : saveError ? (
-            <>
-              <Save size={16} />
-              <span className="save-text">Erreur !</span>
-            </>
-          ) : justSaved ? (
-            <>
-              <Check size={16} />
-              <span className="save-text">Sauvegardé</span>
-            </>
-          ) : (
-            <>
-              <Save size={16} />
-              <span className="save-text">Sauvegarder</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Online Users (including current user) */}
-      {userProfile && (
-        <>
-          <div className="stylebar-divider" />
-          <div className="stylebar-group online-users">
-            {/* Current user */}
-            <div
-              className="online-user-avatar current-user"
-              title={`${userProfile.prenom} ${userProfile.nom} (vous)`}
-            >
-              {getInitials(userProfile.prenom, userProfile.nom)}
-            </div>
-            {/* Other online users */}
-            {onlineUsers.slice(0, 4).map((onlineUser) => (
-              <div
-                key={onlineUser.id}
-                className="online-user-avatar"
-                title={`${onlineUser.prenom} ${onlineUser.nom}`}
-              >
-                {onlineUser.initials}
-              </div>
-            ))}
-            {onlineUsers.length > 4 && (
-              <div className="online-user-avatar more" title={`+${onlineUsers.length - 4} autres`}>
-                +{onlineUsers.length - 4}
-              </div>
-            )}
-          </div>
-        </>
-      )}
 
       <div className="stylebar-divider" />
 
@@ -468,6 +369,37 @@ export default function StyleBar() {
           <AlignRight size={16} />
         </button>
       </div>
+
+      {/* Right-side actions */}
+      <div className="stylebar-right-actions">
+        <button
+          className="stylebar-import-btn"
+          title="Réorganiser les lignes sans espaces vides"
+          disabled={compacting}
+          onClick={async () => {
+            setCompacting(true)
+            await compactRows(activeSheet)
+            await saveData()
+            setCompacting(false)
+          }}
+        >
+          <ArrowDownNarrowWide size={14} />
+          {compacting ? 'En cours…' : 'Compacter'}
+        </button>
+
+        <button
+          className="stylebar-import-btn"
+          title="Importer depuis un PDF"
+          onClick={() => setShowImportModal(true)}
+        >
+          <Upload size={14} />
+          Importer
+        </button>
+      </div>
+
+      {showImportModal && (
+        <ImportModal onClose={() => setShowImportModal(false)} />
+      )}
     </div>
   )
 }

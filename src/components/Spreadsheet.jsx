@@ -1,20 +1,23 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { FileText, Filter } from 'lucide-react'
+import { FileText, Filter, MoreVertical } from 'lucide-react'
 import { useSpreadsheet } from '../context/SpreadsheetContext'
 import { useAuth } from '../context/AuthContext'
 import { getSheetColumns, getColumnIdToLetterMap } from '../data/sheetsConfig'
-import { supabase } from '../lib/supabase'
+import { supabaseGet } from '../lib/supabase'
 import ContextMenu from './ContextMenu'
 import HeaderContextMenu from './HeaderContextMenu'
 import PdfViewerModal from './PdfViewerModal'
+import CRMModal from './CRMModal'
+import { SHEETS } from '../data/sheetsConfig'
 import './Spreadsheet.css'
 
 const TOTAL_ROWS = 999
 const VISIBLE_BUFFER = 10
 const ROW_HEIGHT = 28
 const ROW_NUMBER_WIDTH = 40
-const ACTION_COL_WIDTH = 30
+const ACTION_COL_WIDTH = 56
+const HEADER_HEIGHT = 74 // letter-row(22) + group-row(24) + column-row(28)
 
 export default function Spreadsheet() {
   const {
@@ -39,9 +42,6 @@ export default function Spreadsheet() {
   const containerRef = useRef(null)
   const scrollableRef = useRef(null)
   const scrollRAF = useRef(null)
-  const headerScrollRef1 = useRef(null)
-  const headerScrollRef2 = useRef(null)
-  const headerScrollRef3 = useRef(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
   const [containerHeight, setContainerHeight] = useState(0)
@@ -54,6 +54,9 @@ export default function Spreadsheet() {
 
   // PDF viewer modal
   const [pdfModalData, setPdfModalData] = useState(null)
+
+  // CRM modal
+  const [crmModalData, setCrmModalData] = useState(null)
 
   // Column filter (CHARGES_AFFAIRES)
   const [columnFilter, setColumnFilter] = useState(null) // null = no filter, string = filter value
@@ -87,35 +90,13 @@ export default function Spreadsheet() {
   const [commerciaux, setCommerciaux] = useState([])
 
   useEffect(() => {
-    const fetchTechniciens = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, nom, prenom')
-          .eq('role', 'technique')
-          .order('nom')
-        if (!error && data) setTechniciens(data)
-      } catch (err) {
-        console.error('Error fetching techniciens:', err)
-      }
-    }
-    fetchTechniciens()
+    supabaseGet('profiles', { select: 'id,nom,prenom', role: 'eq.technique', order: 'nom.asc' })
+      .then(data => { if (data.length) setTechniciens(data) })
   }, [])
 
   useEffect(() => {
-    const fetchCommerciaux = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, nom, prenom')
-          .eq('role', 'commercial')
-          .order('nom')
-        if (!error && data) setCommerciaux(data)
-      } catch (err) {
-        console.error('Error fetching commerciaux:', err)
-      }
-    }
-    fetchCommerciaux()
+    supabaseGet('profiles', { select: 'id,nom,prenom', role: 'eq.commercial', order: 'nom.asc' })
+      .then(data => { if (data.length) setCommerciaux(data) })
   }, [])
 
   // Fetch role-based hidden groups for current user
@@ -125,21 +106,10 @@ export default function Spreadsheet() {
       setRoleHiddenGroups({})
       return
     }
-    const fetchVisibility = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('role_visibility')
-          .select('hidden_groups')
-          .eq('role', role)
-          .single()
-        if (!error && data) {
-          setRoleHiddenGroups(data.hidden_groups || {})
-        }
-      } catch {
-        // No config for this role = all visible
-      }
-    }
-    fetchVisibility()
+    supabaseGet('role_visibility', { select: 'hidden_groups', role: `eq.${role}` })
+      .then(data => {
+        if (data[0]) setRoleHiddenGroups(data[0].hidden_groups || {})
+      })
   }, [userProfile?.role])
 
   const columnsConfig = useMemo(() => getSheetColumns(activeSheet), [activeSheet])
@@ -361,10 +331,14 @@ export default function Spreadsheet() {
     return { positions, totalHeight: cumulative }
   }, [totalDisplayedRows, filteredRowIndices, activeSheet, getRowHeight])
 
-  // Calculate visible rows (binary search on cumulative positions)
+  // Calculate visible rows (binary search on cumulative positions).
+  // Rows are offset by HEADER_HEIGHT in the content, so adjust scrollTop accordingly.
   const visibleRows = useMemo(() => {
     const { positions } = rowLayout
-    // Binary search: find first row whose bottom edge > scrollTop
+    // Rows start at content-y = HEADER_HEIGHT. A row at positions[i] is visible when
+    // positions[i] + HEADER_HEIGHT - scrollTop < containerHeight (bottom in viewport)
+    // and positions[i+1] + HEADER_HEIGHT - scrollTop > HEADER_HEIGHT (top below sticky header)
+    // Simplified: positions[i+1] > scrollTop (top clamp)
     let lo = 0, hi = totalDisplayedRows - 1
     while (lo < hi) {
       const mid = (lo + hi) >> 1
@@ -373,8 +347,8 @@ export default function Spreadsheet() {
     }
     const startRow = Math.max(0, lo - VISIBLE_BUFFER)
 
-    // Linear scan from start to find end
-    const viewBottom = scrollTop + containerHeight
+    // viewBottom in row-position space: rows below this are off-screen
+    const viewBottom = scrollTop + containerHeight - HEADER_HEIGHT
     let end = lo
     while (end < totalDisplayedRows && positions[end] < viewBottom) end++
     const endRow = Math.min(totalDisplayedRows, end + VISIBLE_BUFFER)
@@ -412,17 +386,11 @@ export default function Spreadsheet() {
     return () => window.removeEventListener('resize', updateDimensions)
   }, [])
 
-  // Handle scroll: apply header transforms synchronously for instant visual feedback,
-  // then defer React state updates (for visible row/column recalculation) to RAF.
+  // Handle scroll: defer React state updates (for visible row/column recalculation) to RAF.
+  // The header is inside the scroll container with position:sticky so it syncs natively — no JS transform needed.
   const handleScroll = useCallback((e) => {
     const newScrollTop = e.target.scrollTop
     const newScrollLeft = e.target.scrollLeft
-
-    // Immediate DOM update for header scroll (bypasses React render cycle)
-    const transform = `translate3d(-${newScrollLeft}px, 0, 0)`
-    if (headerScrollRef1.current) headerScrollRef1.current.style.transform = transform
-    if (headerScrollRef2.current) headerScrollRef2.current.style.transform = transform
-    if (headerScrollRef3.current) headerScrollRef3.current.style.transform = transform
 
     if (scrollRAF.current) {
       cancelAnimationFrame(scrollRAF.current)
@@ -843,7 +811,6 @@ export default function Spreadsheet() {
           </div>
           <div
             className="scrollable-header-cells"
-            ref={headerScrollRef1}
           >
             {visibleNonFrozenCols.map((col) => {
               const isSelected = selectedColLetters.has(col.dataLetter)
@@ -892,7 +859,6 @@ export default function Spreadsheet() {
           </div>
           <div
             className="scrollable-header-cells"
-            ref={headerScrollRef2}
           >
             {groups.map((group, index) => (
               <div
@@ -957,7 +923,6 @@ export default function Spreadsheet() {
           </div>
           <div
             className="scrollable-header-cells"
-            ref={headerScrollRef3}
           >
             {visibleNonFrozenCols.map((col) => {
               const isSelected = selectedColLetters.has(col.dataLetter)
@@ -1017,14 +982,15 @@ export default function Spreadsheet() {
       const isRowSelected = selectedRowNumbers.has(rowNumber)
 
       const rowHeight = getRowHeight(activeSheet, rowIndex, ROW_HEIGHT)
+      const isCancelled = !!getCellValue(activeSheet, `__cancelled:${rowNumber}`)
 
       rows.push(
         <div
           key={rowIndex}
-          className="spreadsheet-row"
+          className={`spreadsheet-row${isCancelled ? ' spreadsheet-row--cancelled' : ''}`}
           style={{
             position: 'absolute',
-            top: rowLayout.positions[displayIndex],
+            top: rowLayout.positions[displayIndex] + HEADER_HEIGHT,
             height: rowHeight,
           }}
         >
@@ -1045,53 +1011,124 @@ export default function Spreadsheet() {
                 onMouseDown={(e) => handleRowResizeStart(e, rowIndex, getRowHeight(activeSheet, rowIndex, ROW_HEIGHT))}
               />
             </div>
-            {/* PDF action column */}
+            {/* Action column (PDF + Actions) */}
             <div
               className="cell action-col-cell"
               style={{ width: ACTION_COL_WIDTH }}
             >
               {getCellValue(activeSheet, `A${rowNumber}`) && (
-                <button
-                  className="pdf-icon-btn"
-                  title="Voir le formulaire VT"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    // Read PDF data from cells (persists across reloads)
-                    const colMap = getColumnIdToLetterMap(activeSheet)
-                    const getCell = (colId) => {
-                      const letter = colMap[colId]
-                      return letter ? getCellValue(activeSheet, `${letter}${rowNumber}`) : ''
-                    }
-                    const clientColId = activeSheet === 'btoc-comptant' ? 'Colonne1' : 'NOM_PRENOM'
-                    const cellData = {
-                      commercial: getCell('COMMERCIAL'),
-                      clientName: getCell(clientColId),
-                      date: getCell('DATE_DDE_VT'),
-                      adresse: getCell('ADRESSE_INSTALLATION'),
-                      codePostal: getCell('CODE_POSTAL'),
-                      commune: getCell('VILLE'),
-                      email: getCell('EMAIL'),
-                      tel: getCell('TELEPHONE'),
-                      typeContrat: activeSheet === 'btoc-abonnement' ? 'abonnement' : 'comptant',
-                      contratMaintenance: getCell('CONTRAT_MAINTENANCE'),
-                      puissance: getCell('PUISSANCE_PREVI') || getCell('PUISSANCE_REALISEE'),
-                      chargesAffaires: getCell('CHARGES_AFFAIRES'),
-                    }
-                    // Merge with persisted vtFormData from DB (stored as __vtFormData:row in cells)
-                    const persistedJson = getCellValue(activeSheet, `__vtFormData:${rowNumber}`)
-                    const persistedData = persistedJson ? JSON.parse(persistedJson) : null
-                    // Fall back to in-memory vtFormData (before first save)
-                    const storedData = persistedData || vtFormData[`${activeSheet}:${rowNumber}`]
-                    if (storedData) {
-                      Object.keys(storedData).forEach(key => {
-                        if (!cellData[key]) cellData[key] = storedData[key]
+                <>
+                  <button
+                    className="action-icon-btn"
+                    title="Voir le formulaire VT"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // Read PDF data from cells (persists across reloads)
+                      const colMap = getColumnIdToLetterMap(activeSheet)
+                      const getCell = (colId) => {
+                        const letter = colMap[colId]
+                        return letter ? getCellValue(activeSheet, `${letter}${rowNumber}`) : ''
+                      }
+                      const clientColId = activeSheet === 'btoc-comptant' ? 'Colonne1' : 'NOM_PRENOM'
+                      const cellData = {
+                        commercial: getCell('COMMERCIAL'),
+                        clientName: getCell(clientColId),
+                        date: getCell('DATE_DDE_VT'),
+                        adresse: getCell('ADRESSE_INSTALLATION'),
+                        codePostal: getCell('CODE_POSTAL'),
+                        commune: getCell('VILLE'),
+                        email: getCell('EMAIL'),
+                        tel: getCell('TELEPHONE'),
+                        typeContrat: activeSheet === 'btoc-abonnement' ? 'abonnement' : 'comptant',
+                        contratMaintenance: getCell('CONTRAT_MAINTENANCE'),
+                        puissance: getCell('PUISSANCE_PREVI') || getCell('PUISSANCE_REALISEE'),
+                        chargesAffaires: getCell('CHARGES_AFFAIRES'),
+                      }
+                      // Merge with persisted vtFormData from DB (stored as __vtFormData:row in cells)
+                      const persistedJson = getCellValue(activeSheet, `__vtFormData:${rowNumber}`)
+                      const persistedData = persistedJson ? JSON.parse(persistedJson) : null
+                      // Fall back to in-memory vtFormData (before first save)
+                      const storedData = persistedData || vtFormData[`${activeSheet}:${rowNumber}`]
+                      if (storedData) {
+                        Object.keys(storedData).forEach(key => {
+                          if (!cellData[key]) cellData[key] = storedData[key]
+                        })
+                      }
+                      // Merge technical VT form data (step 2) — only fills missing keys
+                      try {
+                        const vtTechJson = getCellValue(activeSheet, `__vtTechForm:${rowNumber}`)
+                        if (vtTechJson) {
+                          const vtTech = JSON.parse(vtTechJson)
+                          Object.keys(vtTech).forEach(key => {
+                            if (!cellData[key]) cellData[key] = vtTech[key]
+                          })
+                        }
+                      } catch { /* ignore */ }
+                      // Spreadsheet cells always win — apply on top of everything
+                      const dateRetourCell = getCell('DATE_RETOUR_VT')
+                      if (dateRetourCell) cellData.dateRetour = dateRetourCell
+                      setPdfModalData(cellData)
+                    }}
+                  >
+                    <FileText size={14} />
+                  </button>
+                  <button
+                    className="action-icon-btn"
+                    title="Actions"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const colMap = getColumnIdToLetterMap(activeSheet)
+                      const getCell = (colId) => {
+                        const letter = colMap[colId]
+                        return letter ? getCellValue(activeSheet, `${letter}${rowNumber}`) : ''
+                      }
+                      const clientColId = activeSheet === 'btoc-comptant' ? 'Colonne1' : 'NOM_PRENOM'
+                      const sheetConfig = SHEETS.find(s => s.id === activeSheet)
+                      setCrmModalData({
+                        rowNumber,
+                        activeSheet,
+                        clientName:    getCell(clientColId),
+                        sheetLabel:    sheetConfig?.name || activeSheet,
+                        // Coordonnées clients
+                        commercial:    getCell('COMMERCIAL'),
+                        objectif:      getCell('OBJECTIF'),
+                        typeContact:   getCell('TYPE_CONTACT'),
+                        adresse:       getCell('ADRESSE_INSTALLATION'),
+                        ville:         getCell('VILLE'),
+                        codePostal:    getCell('CODE_POSTAL'),
+                        telephone:     getCell('TELEPHONE'),
+                        email:         getCell('EMAIL'),
+                        typeProduit:   getCell('TYPE_PRODUIT'),
+                        interlocuteur: getCell('INTERLOCUTEUR') || undefined,
+                        // Étapes suivi de dossier
+                        dateDemandeVT: getCell('DATE_DDE_VT'),
+                        dateRetourVT:  getCell('DATE_RETOUR_VT'),
+                        nomenclature:  getCell('RECEPTION_BDC'),
+                        nDP:           getCell('N_DP') || getCell('DEMANDE_DP'),
+                        raccordement:  getCell('DDE_RACC_EDF'),
+                        vad:           getCell('ENREGISTREMENT_ADMIN'),
+                        datePose:      getCell('DATE_REELLE_POSE') || getCell('DATE_POSE'),
+                        consuelVise:   getCell('CONSUEL_VISE'),
+                        mesEDF:        getCell('MES_EDF'),
+                        chargesAffaires: getCell('CHARGES_AFFAIRES'),
+                        vtTechFormData: (() => {
+                          try {
+                            const json = getCellValue(activeSheet, `__vtTechForm:${rowNumber}`)
+                            return json ? JSON.parse(json) : null
+                          } catch { return null }
+                        })(),
+                        nomenclatureData: (() => {
+                          try {
+                            const json = getCellValue(activeSheet, `__nomenclature:${rowNumber}`)
+                            return json ? JSON.parse(json) : null
+                          } catch { return null }
+                        })(),
                       })
-                    }
-                    setPdfModalData(cellData)
-                  }}
-                >
-                  <FileText size={14} />
-                </button>
+                    }}
+                  >
+                    <MoreVertical size={14} />
+                  </button>
+                </>
               )}
             </div>
 
@@ -1125,7 +1162,7 @@ export default function Spreadsheet() {
                       autoFocus
                     />
                   ) : (
-                    <div className="cell-content" style={style}>
+                    <div className="cell-content" style={{ ...style, textAlign: col.align || undefined }}>
                       {value}
                     </div>
                   )}
@@ -1135,7 +1172,12 @@ export default function Spreadsheet() {
           </div>
 
           {/* Scrollable cells */}
-          <div className="scrollable-cells">
+          <div className="scrollable-cells" style={{ position: 'relative' }}>
+            {isCancelled && (
+              <div className="sp-cancelled-overlay">
+                <span className="sp-cancelled-label">Annulé</span>
+              </div>
+            )}
             {visibleNonFrozenCols.map((col) => {
               const cellId = `${col.dataLetter}${rowIndex + 1}`
               const isSelected = isCellSelected(cellId)
@@ -1183,7 +1225,7 @@ export default function Spreadsheet() {
                       autoFocus
                     />
                   ) : (
-                    <div className="cell-content" style={style}>
+                    <div className="cell-content" style={{ ...style, textAlign: col.align || undefined }}>
                       {value}
                     </div>
                   )}
@@ -1200,8 +1242,6 @@ export default function Spreadsheet() {
 
   return (
     <div className="spreadsheet-container" ref={containerRef}>
-      {renderColumnHeaders()}
-
       <div
         className="spreadsheet-body"
         ref={scrollableRef}
@@ -1210,10 +1250,11 @@ export default function Spreadsheet() {
         <div
           className="spreadsheet-content"
           style={{
-            height: rowLayout.totalHeight,
+            height: rowLayout.totalHeight + HEADER_HEIGHT,
             width: allColumns.totalWidth,
           }}
         >
+          {renderColumnHeaders()}
           {renderRows()}
         </div>
       </div>
@@ -1241,6 +1282,12 @@ export default function Spreadsheet() {
         isOpen={!!pdfModalData}
         onClose={() => setPdfModalData(null)}
         data={pdfModalData}
+      />
+
+      <CRMModal
+        isOpen={!!crmModalData}
+        onClose={() => setCrmModalData(null)}
+        data={crmModalData}
       />
 
       {/* Filter dropdown portal */}

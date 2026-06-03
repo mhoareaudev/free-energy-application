@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { X, Plus, Trash2, Upload, User, Edit2, XCircle, Users, Briefcase, Save, Shield } from 'lucide-react'
+import { X, Plus, Trash2, Upload, User, Edit2, XCircle, Users, Briefcase, Save, Shield, Mail, Loader } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { supabaseGet, supabaseUpsert } from '../lib/supabase'
 import { ROLES, useAuth } from '../context/AuthContext'
 import { SHEETS, getSheetColumns } from '../data/sheetsConfig'
+import RichTextEditor from './RichTextEditor'
 import './AdminPanel.css'
 
 export default function AdminPanel({ isOpen, onClose }) {
@@ -32,6 +34,44 @@ export default function AdminPanel({ isOpen, onClose }) {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
 
+  // ── Email template state ──────────────────────────────────────
+  const [mailSubject,     setMailSubject]     = useState('')
+  const [mailHtml,        setMailHtml]        = useState('')
+  const [mailLoading,     setMailLoading]     = useState(false)
+  const [mailSaving,      setMailSaving]      = useState(false)
+  const [mailSaved,       setMailSaved]       = useState(false)
+
+  const fetchEmailTemplate = async () => {
+    setMailLoading(true)
+    try {
+      const rows = await supabaseGet('email_templates', { name: 'eq.vt_request', select: 'subject,html_content' })
+      if (rows?.[0]) {
+        setMailSubject(rows[0].subject || '')
+        setMailHtml(rows[0].html_content || '')
+      }
+    } catch {}
+    finally { setMailLoading(false) }
+  }
+
+  const saveEmailTemplate = async () => {
+    setMailSaving(true)
+    try {
+      await supabaseUpsert('email_templates', {
+        name: 'vt_request',
+        subject: mailSubject,
+        html_content: mailHtml,
+        updated_at: new Date().toISOString(),
+      }, 'name')
+      setMailSaved(true)
+      setTimeout(() => setMailSaved(false), 2500)
+    } catch (err) {
+      console.error('saveEmailTemplate error', err)
+      setError('Erreur lors de la sauvegarde du template.')
+    } finally {
+      setMailSaving(false)
+    }
+  }
+
   // Fetch data on mount and tab change
   useEffect(() => {
     if (isOpen) {
@@ -41,6 +81,8 @@ export default function AdminPanel({ isOpen, onClose }) {
         fetchCommerciaux()
       } else if (activeTab === 'roles') {
         fetchRoleVisibility()
+      } else if (activeTab === 'marketing') {
+        fetchEmailTemplate()
       }
     }
   }, [isOpen, activeTab])
@@ -326,16 +368,12 @@ export default function AdminPanel({ isOpen, onClose }) {
 
   const getRoleLabel = (role) => {
     switch (role) {
-      case ROLES.ADMINISTRATIF:
-        return 'Administratif'
-      case ROLES.TECHNIQUE:
-        return 'Technique'
-      case ROLES.COMMERCIAL:
-        return 'Commercial'
-      case ROLES.ADMINISTRATEUR:
-        return 'Administrateur'
-      default:
-        return role
+      case ROLES.ADMINISTRATIF:  return 'Administratif'
+      case ROLES.TECHNIQUE:      return 'Technique'
+      case ROLES.COMMERCIAL:     return 'Commercial'
+      case ROLES.ADMINISTRATEUR: return 'Administrateur'
+      case ROLES.MARKETING:      return 'Marketing'
+      default: return role
     }
   }
 
@@ -379,6 +417,13 @@ export default function AdminPanel({ isOpen, onClose }) {
           >
             <Shield size={16} />
             Rôles
+          </button>
+          <button
+            className={`admin-tab ${activeTab === 'marketing' ? 'active' : ''}`}
+            onClick={() => setActiveTab('marketing')}
+          >
+            <Mail size={16} />
+            Marketing
           </button>
         </div>
 
@@ -476,6 +521,7 @@ export default function AdminPanel({ isOpen, onClose }) {
                       <option value={ROLES.ADMINISTRATIF}>Administratif</option>
                       <option value={ROLES.TECHNIQUE}>Technique</option>
                       <option value={ROLES.ADMINISTRATEUR}>Administrateur</option>
+                      <option value={ROLES.MARKETING}>Marketing</option>
                     </select>
                   </div>
                 </div>
@@ -708,6 +754,68 @@ export default function AdminPanel({ isOpen, onClose }) {
               )}
             </div>
           </>
+        )}
+
+        {/* Marketing Tab */}
+        {activeTab === 'marketing' && (
+          <div className="mkt-root">
+            <div className="mkt-section-title">
+              <Mail size={15} />
+              Mailings
+            </div>
+
+            <div className="mkt-mailing-card">
+              <div className="mkt-mailing-header">
+                <span className="mkt-mailing-name">Mail de demande de VT</span>
+                <span className="mkt-mailing-hint">Envoyé aux techniciens lors de chaque nouvelle demande de visite technique</span>
+              </div>
+
+              {mailLoading ? (
+                <div className="mkt-loading"><Loader size={16} className="mkt-spin" /> Chargement…</div>
+              ) : (
+                <div className="mkt-editor-wrap">
+                  {/* Subject */}
+                  <div className="mkt-field">
+                    <label className="mkt-label">Objet de l'email</label>
+                    <input
+                      type="text"
+                      className="mkt-subject-input"
+                      value={mailSubject}
+                      onChange={e => setMailSubject(e.target.value)}
+                      placeholder="Ex : Nouvelle demande de VT — {{nom_client}}"
+                    />
+                    <p className="mkt-field-hint">Vous pouvez utiliser des variables comme <code>{'{{nom_client}}'}</code> directement dans l'objet.</p>
+                  </div>
+
+                  {/* Body */}
+                  <div className="mkt-field">
+                    <label className="mkt-label">Corps de l'email</label>
+                    <RichTextEditor
+                      value={mailHtml}
+                      onChange={setMailHtml}
+                      placeholder="Rédigez votre email ici…"
+                    />
+                  </div>
+
+                  <div className="mkt-actions">
+                    {mailSaved && (
+                      <span className="mkt-saved-badge">✓ Sauvegardé</span>
+                    )}
+                    <button
+                      className="btn btn-primary"
+                      onClick={saveEmailTemplate}
+                      disabled={mailSaving}
+                    >
+                      {mailSaving
+                        ? <><Loader size={14} className="mkt-spin" /> Sauvegarde…</>
+                        : <><Save size={14} /> Sauvegarder</>
+                      }
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Rôles Tab */}

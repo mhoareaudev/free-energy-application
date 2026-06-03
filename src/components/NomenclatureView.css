@@ -1,0 +1,218 @@
+.nom-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Header ── */
+.nom-view-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 12px;
+  flex-shrink: 0;
+}
+
+.nom-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.nom-btn:hover { opacity: 0.85; }
+
+.nom-btn--modifier {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+.nom-btn--download {
+  background: #f8fafc;
+  color: #475569;
+  border-color: #e2e8f0;
+  margin-left: auto;
+}
+.nom-btn--save {
+  background: #f8fafc;
+  color: #334155;
+  border-color: #e2e8f0;
+}
+.nom-btn--validate {
+  background: #f97316;
+  color: #fff;
+  border-color: #f97316;
+}
+.nom-btn--validate:hover { background: #ea580c; opacity: 1; }
+
+.nom-badge-validated {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.nom-badge-draft {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.nom-btn--download:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Tables container ── */
+.nom-tables {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+/* Custom scrollbar */
+.nom-tables::-webkit-scrollbar { width: 5px; }
+.nom-tables::-webkit-scrollbar-track { background: transparent; }
+.nom-tables::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
+.nom-tables::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+
+/* ── Category block ── */
+.nom-category {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.nom-cat-header {
+  background: #9b1111;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  padding: 6px 12px;
+}
+
+/* ── Table ── */
+.nom-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.nom-table thead tr {
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.nom-table th {
+  padding: 5px 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.nom-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+}
+.nom-table tbody tr:last-child { border-bottom: none; }
+.nom-table tbody tr:hover { background: #fafafa; }
+
+.nom-table td {
+  padding: 5px 10px;
+  color: #1e293b;
+}
+
+.nom-col-qty {
+  width: 80px;
+  text-align: center !important;
+}
+.nom-col-unit {
+  width: 72px;
+  color: #b45309 !important;
+  font-weight: 500;
+}
+.nom-col-del { width: 32px; }
+
+.nom-qty-input {
+  width: 56px;
+  padding: 2px 5px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+  color: #1e293b;
+  background: #fff;
+}
+.nom-qty-input:focus {
+  outline: none;
+  border-color: #f97316;
+}
+
+.nom-del-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #cbd5e1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+.nom-del-btn:hover {
+  color: #dc2626;
+  background: #fee2e2;
+}
+
+/* ── Add row button ── */
+.nom-add-row-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: transparent;
+  border: none;
+  border-top: 1px dashed #e2e8f0;
+  width: 100%;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.nom-add-row-btn:hover {
+  background: #fff7ed;
+  color: #f97316;
+}
+
+.nom-empty {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+  padding: 24px 0;
+}

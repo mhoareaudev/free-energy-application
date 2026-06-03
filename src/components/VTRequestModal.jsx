@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
+import { formatDateFR } from '../utils/dateUtils'
 import { X } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { supabaseGet, supabasePost } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useSpreadsheet } from '../context/SpreadsheetContext'
 import { useNotifications } from '../context/NotificationContext'
@@ -32,25 +33,11 @@ export default function VTRequestModal({ isOpen, onClose }) {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
 
-  // Fetch commerciaux on mount
+  // Fetch commerciaux on open
   useEffect(() => {
-    const fetchCommerciaux = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('commerciaux')
-          .select('id, nom, prenom')
-          .order('nom')
-
-        if (error) throw error
-        setCommerciaux(data || [])
-      } catch (err) {
-        console.error('Error fetching commerciaux:', err)
-      }
-    }
-
-    if (isOpen) {
-      fetchCommerciaux()
-    }
+    if (!isOpen) return
+    supabaseGet('commerciaux', { select: 'id,nom,prenom', order: 'nom.asc' })
+      .then(data => setCommerciaux(data))
   }, [isOpen])
 
   const handleChange = (e) => {
@@ -84,16 +71,19 @@ export default function VTRequestModal({ isOpen, onClose }) {
       const targetSheet = getTargetSheet()
       const commercialName = formData.commercial || `${userProfile?.prenom} ${userProfile?.nom}`
       const clientName = `${formData.prenom} ${formData.nom}`
-      const today = new Date().toLocaleDateString('fr-FR')
+      const today = formatDateFR()
+      const chargesAffaires = [userProfile?.prenom, userProfile?.nom].filter(Boolean).join(' ')
 
       // Add to spreadsheet
       addVTRequest(targetSheet, {
         commercial: commercialName,
         clientName: clientName,
         dateDemandeVT: today,
+        chargesAffaires,
         vtFormData: {
           commercial: commercialName,
           clientName: clientName,
+          chargesAffaires,
           date: today,
           typeContrat: formData.typeContrat,
           puissance: formData.puissance,
@@ -109,23 +99,17 @@ export default function VTRequestModal({ isOpen, onClose }) {
         },
       })
 
-      // Also save to Supabase for tracking
-      const { error: insertError } = await supabase
-        .from('vt_requests')
-        .insert({
-          nom: formData.nom,
-          prenom: formData.prenom,
-          commercial: commercialName,
-          type_client: formData.typeClient,
-          type_contrat: formData.typeContrat,
-          target_sheet: targetSheet,
-          requested_by: userProfile?.id,
-          status: 'pending',
-        })
-
-      if (insertError) {
-        console.warn('Could not save to vt_requests:', insertError)
-      }
+      // Save to Supabase for tracking (fire-and-forget — non-critical)
+      supabasePost('vt_requests', {
+        nom: formData.nom,
+        prenom: formData.prenom,
+        commercial: commercialName,
+        type_client: formData.typeClient,
+        type_contrat: formData.typeContrat,
+        target_sheet: targetSheet,
+        requested_by: userProfile?.id,
+        status: 'pending',
+      }).catch(e => console.warn('Could not save to vt_requests:', e))
 
       // Notify all other users about the new VT request
       const requesterName = `${userProfile?.prenom || ''} ${userProfile?.nom || ''}`.trim()

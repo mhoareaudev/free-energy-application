@@ -22,6 +22,39 @@
   gap: 2px;
 }
 
+.stylebar-right-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stylebar-import-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.stylebar-import-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.stylebar-import-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .stylebar-divider {
   width: 1px;
   height: 20px;

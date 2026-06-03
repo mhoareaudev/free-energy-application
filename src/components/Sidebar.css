@@ -1,0 +1,436 @@
+.sidebar {
+  width: 62px;
+  min-width: 62px;
+  height: 100vh;
+  background: #16202e;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  /* overflow must be visible so tooltips escape the sidebar bounds */
+  overflow: visible;
+  position: relative;
+  z-index: 200;
+}
+
+/* ── Logo ── */
+.sidebar-logo {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+  padding: 0 10px;
+}
+
+.sidebar-logo img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+/* ── Nav ── */
+.sidebar-nav {
+  flex: 1;
+  padding: 12px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  /* no overflow-y:auto — must be visible for tooltips */
+}
+
+/* ── Shared icon button ── */
+.sidebar-nav-item,
+.sidebar-icon-btn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.sidebar-nav-item:hover,
+.sidebar-icon-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-nav-item.active {
+  color: #fff;
+  background: #f97316;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.4);
+}
+
+.sidebar-nav-item.active:hover {
+  background: #ea580c;
+}
+
+/* ── Tooltip ── */
+.sidebar-tooltip {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #0f1a28;
+  color: #f1f5f9;
+  padding: 7px 13px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 9999;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  letter-spacing: 0.01em;
+  /* small arrow pointing left */
+}
+
+.sidebar-tooltip::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: #0f1a28;
+}
+
+.sidebar-nav-item:hover .sidebar-tooltip,
+.sidebar-icon-btn:hover .sidebar-tooltip,
+.sidebar-avatar-wrap:hover .sidebar-tooltip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(2px);
+}
+
+/* User tooltip variant (two-line) */
+.sidebar-tooltip--user {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+}
+
+.sidebar-tooltip-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.sidebar-tooltip-role {
+  font-size: 11px;
+  color: rgba(241, 245, 249, 0.55);
+  text-transform: capitalize;
+}
+
+/* ── Dossiers submenu ── */
+.sidebar-dossiers-wrap {
+  position: relative;
+  width: 62px;          /* full sidebar width → submenu aligns to right edge */
+  display: flex;
+  justify-content: center;
+}
+
+.sidebar-dossiers-wrap:hover .sidebar-nav-item {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-dossiers-wrap:hover .sidebar-nav-item.active {
+  background: #ea580c;
+}
+
+.sidebar-submenu {
+  position: absolute;
+  left: calc(100% + 8px); /* 8px gap from the sidebar */
+  top: 0;
+  min-width: 196px;
+  background: #0f1a28;
+  border-radius: 10px;
+  padding: 6px 0 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 9999;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.2);
+  /* invisible bridge: keeps hover active while moving mouse to submenu */
+}
+
+.sidebar-submenu::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 0;
+  bottom: 0;
+  width: 18px; /* bridges the 8px gap so hover stays active */
+}
+
+.sidebar-dossiers-wrap:hover .sidebar-submenu {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.sidebar-submenu-header {
+  padding: 6px 14px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.sidebar-submenu-sep {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 5px 0;
+}
+
+.sidebar-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.12s;
+  letter-spacing: 0.01em;
+}
+
+.sidebar-submenu-item:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.sidebar-submenu-item.active {
+  color: #f97316;
+}
+
+.sidebar-submenu-item.active svg {
+  color: #f97316;
+}
+
+/* ── Hide on mobile ── */
+.sidebar-submenu-item--no-mobile { /* shown on desktop */ }
+
+/* Avatar menu is only rendered via JS state — hidden on desktop just in case */
+.sidebar-avatar-menu { display: none; }
+
+/* ── Bottom ── */
+.sidebar-bottom {
+  padding: 10px 0 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Avatar wrap acts like the icon buttons */
+.sidebar-avatar-wrap {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+.sidebar-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #f97316;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+/* ── Mobile: fixed bottom nav ── */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 58px;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 300;
+  }
+
+  .sidebar-logo { display: none; }
+
+  .sidebar-nav {
+    flex-direction: row;
+    flex: 1;
+    padding: 0 6px;
+    gap: 2px;
+    justify-content: space-around;
+    align-items: center;
+    height: 100%;
+  }
+
+  .sidebar-bottom {
+    flex-direction: row;
+    border-top: none;
+    padding: 0 6px;
+    gap: 2px;
+    align-items: center;
+    height: 100%;
+  }
+
+  /* Hide logout button on mobile */
+  .sidebar-icon-btn--mob-hide { display: none; }
+
+  /* Hide text tooltips on mobile */
+  .sidebar-tooltip { display: none; }
+
+  /* ── Dossiers submenu: compact fixed card, aligned to the button area ── */
+  .sidebar-dossiers-wrap {
+    position: static;
+    width: auto;
+  }
+
+  .sidebar-submenu {
+    position: fixed;
+    /* MUST override desktop top:0 — otherwise bottom+top both set = full viewport height */
+    top: auto;
+    bottom: 70px; /* 58px nav + 12px gap */
+    /* Center on the Dossiers button: nav width ≈ screen - 54px (avatar section),
+       so button center = 50% - 27px; left edge of 200px menu = center - 100px */
+    left: calc(50% - 127px);
+    right: auto;
+    width: 200px;
+    min-width: unset;
+    border-radius: 12px;
+    padding: 6px 0 4px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+    transition: opacity 0.18s, transform 0.18s;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+  }
+
+  .sidebar-submenu::after { display: none; }
+  .sidebar-submenu::before { display: none; }
+
+  /* Prevent desktop :hover from triggering on mobile tap */
+  .sidebar-dossiers-wrap:hover .sidebar-submenu {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+  }
+
+  /* Click-controlled open state */
+  .sidebar-dossiers-wrap--open .sidebar-submenu {
+    opacity: 1 !important;
+    pointer-events: all !important;
+    transform: translateY(0) !important;
+  }
+
+  /* Compact items */
+  .sidebar-submenu-item { font-size: 13px; padding: 9px 14px; }
+  .sidebar-submenu-header { padding: 6px 14px 4px; font-size: 10px; }
+  .sidebar-submenu-sep { margin: 3px 0; }
+
+  /* Hide the whole wrapper div (including any separator inside) for noMobile items */
+  .sidebar-submenu-wrap--no-mobile { display: none; }
+
+  /* ── Avatar menu (mobile only) ── */
+  .sidebar-avatar-wrap {
+    cursor: pointer;
+  }
+
+  .sidebar-avatar-menu {
+    position: fixed;
+    bottom: 70px;
+    right: 12px;
+    min-width: 180px;
+    background: #0f1a28;
+    border-radius: 14px;
+    padding: 4px 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+  }
+
+  /* Caret pointing down toward the avatar button */
+  .sidebar-avatar-menu::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    right: 14px;
+    border: 8px solid transparent;
+    border-top-color: #0f1a28;
+  }
+
+  .sidebar-avatar-menu-info {
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .sidebar-avatar-menu-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f1f5f9;
+  }
+
+  .sidebar-avatar-menu-role {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.45);
+    text-transform: capitalize;
+    margin-top: 2px;
+  }
+
+  .sidebar-avatar-menu-sep {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .sidebar-avatar-menu-logout {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 11px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #f87171;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: background 0.12s;
+  }
+
+  .sidebar-avatar-menu-logout:hover { background: rgba(255, 255, 255, 0.06); }
+
+  /* Show the avatar menu on mobile */
+  .sidebar-avatar-menu { display: block; }
+}

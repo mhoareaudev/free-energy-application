@@ -11,6 +11,7 @@ export const ROLES = {
   TECHNIQUE: 'technique',
   COMMERCIAL: 'commercial',
   ADMINISTRATEUR: 'administrateur',
+  MARKETING: 'marketing',
 }
 
 export const AuthProvider = ({ children }) => {

@@ -1,0 +1,203 @@
+.pdfv-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1000;
+}
+
+.pdfv-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: min(96vw, 940px);
+  height: min(95vh, 880px);
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+.pdfv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.pdfv-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.pdfv-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: background 0.15s, color 0.15s;
+}
+.pdfv-close:hover { background: #f1f5f9; color: #0f172a; }
+
+/* ── Scrollable body ─────────────────────────────────────────── */
+.pdfv-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  background: #e5e7eb;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pdfv-status {
+  text-align: center;
+  padding: 60px 20px;
+  color: #64748b;
+  font-size: 14px;
+}
+.pdfv-error { color: #ef4444; }
+
+/* ── Pages container ─────────────────────────────────────────── */
+.pdfv-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+/* ── Individual page ─────────────────────────────────────────── */
+.pdfv-page {
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.pdfv-canvas {
+  display: block;
+}
+
+/* ── Overlay inputs ──────────────────────────────────────────── */
+.pdfv-overlay-input {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 2px;
+  font-size: 10.5px;
+  font-family: inherit;
+  color: #0f172a;
+  padding: 1px 3px;
+  outline: none;
+  box-sizing: border-box;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+  line-height: 1.4;
+}
+.pdfv-overlay-input:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+.pdfv-overlay-input:focus {
+  background: #fff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
+}
+
+.pdfv-overlay-textarea {
+  resize: none;
+  overflow: hidden;
+}
+
+/* ── Checkbox overlay ────────────────────────────────────────── */
+.pdfv-overlay-check-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.pdfv-overlay-checkbox {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #f59e0b;
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.pdfv-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.pdfv-btn-cancel {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #64748b;
+  transition: background 0.15s;
+}
+.pdfv-btn-cancel:hover { background: #f1f5f9; }
+
+.pdfv-btn-save {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pdfv-btn-save:hover:not(:disabled) { background: #d97706; }
+.pdfv-btn-save:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Mobile ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .pdfv-modal {
+    inset: 0;
+    top: 0;
+    left: 0;
+    transform: none;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    max-width: none;
+    max-height: none;
+  }
+
+  .pdfv-body {
+    padding: 10px 0;
+    align-items: flex-start;
+  }
+
+  .pdfv-pages {
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+  }
+}

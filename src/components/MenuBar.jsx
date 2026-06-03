@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Share2, Download, Printer } from 'lucide-react'
 import './MenuBar.css'
 
-export default function MenuBar() {
+export default function MenuBar({ activePage, setActivePage }) {
   const [showFichierMenu, setShowFichierMenu] = useState(false)
   const [dropdownPos, setDropdownPos] = useState(null)
   const fichierBtnRef = useRef(null)
@@ -82,8 +82,19 @@ export default function MenuBar() {
       </div>
 
       <div className="menubar-item">
-        <button className="menubar-btn active-tab">
+        <button
+          className={`menubar-btn ${activePage === 'spreadsheet' ? 'active-tab' : ''}`}
+          onClick={() => setActivePage('spreadsheet')}
+        >
           Accueil
+        </button>
+      </div>
+      <div className="menubar-item">
+        <button
+          className={`menubar-btn ${activePage === 'nomenclatures' ? 'active-tab' : ''}`}
+          onClick={() => setActivePage('nomenclatures')}
+        >
+          Nomenclatures
         </button>
       </div>
     </nav>

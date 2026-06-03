@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { supabase, supabaseUrl, supabaseAnonKey } from '../lib/supabase'
 import { getColumnIdToLetterMap } from '../data/sheetsConfig'
+import { addDaysToFR } from '../utils/dateUtils'
 import { useAuth } from './AuthContext'
 
 const SpreadsheetContext = createContext({})
@@ -12,7 +13,7 @@ const MAX_HISTORY = 50
 export const SpreadsheetProvider = ({ children }) => {
   const { user, userProfile } = useAuth()
 
-  const [sheets, setSheets] = useState({})
+  const [sheets, _setSheets] = useState({})
   const [activeSheet, setActiveSheet] = useState('btoc-comptant')
   const [selectedCells, setSelectedCells] = useState([])
   const [editingCell, setEditingCell] = useState(null)
@@ -25,14 +26,14 @@ export const SpreadsheetProvider = ({ children }) => {
   const [lastSaved, setLastSaved] = useState(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
-  // Online users (just for showing who's connected)
-  const [onlineUsers, setOnlineUsers] = useState([])
-
   // VT form data stored per row (sheetId:row -> form data) for PDF generation
   const [vtFormData, setVtFormData] = useState({})
 
   // Ref to prevent concurrent saves
   const savingRef = useRef(false)
+
+  // Auto-save debounce timer
+  const autoSaveTimerRef = useRef(null)
 
   // Timestamp of last successful save (to ignore realtime echoes)
   const lastSaveTimeRef = useRef(0)
@@ -92,102 +93,17 @@ export const SpreadsheetProvider = ({ children }) => {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Subscribe to Supabase Realtime for live updates
-  useEffect(() => {
-    const channel = supabase
-      .channel('sheets-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'sheets',
-        },
-        (payload) => {
-          console.log('Realtime update received:', payload)
 
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const { sheet_id, data, styles } = payload.new
-
-            // Ignore echoes: during active save OR within 3s after save
-            if (savingRef.current || (Date.now() - lastSaveTimeRef.current < 3000)) {
-              console.log('Ignoring realtime echo (save in progress or recent)')
-              return
-            }
-
-            setSheets(prev => ({
-              ...prev,
-              [sheet_id]: {
-                cells: data || {},
-                styles: styles || {},
-              }
-            }))
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
-
-  // Simple presence tracking - just who's online (no selections)
-  useEffect(() => {
-    if (!user || !userProfile) return
-
-    const channel = supabase.channel('online-users', {
-      config: {
-        presence: {
-          key: user.id,
-        },
-      },
-    })
-
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState()
-        const users = []
-
-        Object.keys(state).forEach(key => {
-          const presences = state[key]
-          if (presences && presences.length > 0) {
-            const presence = presences[0]
-            // Don't include current user
-            if (presence.user_id !== user.id) {
-              users.push({
-                id: presence.user_id,
-                nom: presence.nom,
-                prenom: presence.prenom,
-                initials: (presence.prenom?.charAt(0) || '') + (presence.nom?.charAt(0) || '') || '?',
-              })
-            }
-          }
-        })
-
-        setOnlineUsers(users)
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({
-            user_id: user.id,
-            nom: userProfile.nom,
-            prenom: userProfile.prenom,
-            online_at: new Date().toISOString(),
-          })
-        }
-      })
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [user, userProfile])
-
-  // Ref to always have current sheets value for saving
+  // Ref always in sync with sheets — updated synchronously inside every setSheets call
   const sheetsRef = useRef(sheets)
-  useEffect(() => {
-    sheetsRef.current = sheets
-  }, [sheets])
+
+  // Wrapper: computes next state synchronously from sheetsRef.current,
+  // so saveAllSheets always reads fresh data regardless of React's batch schedule.
+  const setSheets = useCallback((updater) => {
+    const next = typeof updater === 'function' ? updater(sheetsRef.current) : updater
+    sheetsRef.current = next
+    _setSheets(next)
+  }, [])
 
   // When tab becomes visible again, ensure clean state and warm up connection
   useEffect(() => {
@@ -290,16 +206,6 @@ export const SpreadsheetProvider = ({ children }) => {
           }
         }
       }))
-      sheetsRef.current = {
-        ...sheetsRef.current,
-        [sheetId]: {
-          ...sheetsRef.current[sheetId],
-          cells: {
-            ...sheetsRef.current[sheetId]?.cells,
-            [cellId]: value,
-          }
-        }
-      }
       pendingEditRef.current = null
     }
 
@@ -407,20 +313,21 @@ export const SpreadsheetProvider = ({ children }) => {
     }
   }, [])
 
-  // Get cell value
+  // Get cell value — reads from sheetsRef (always synchronously up-to-date)
+  // so callers like modal open handlers never see stale data between renders
   const getCellValue = useCallback((sheetId, cellId) => {
-    return sheets[sheetId]?.cells?.[cellId] ?? ''
-  }, [sheets])
+    return sheetsRef.current[sheetId]?.cells?.[cellId] ?? ''
+  }, [])
 
   // Get cell style
   const getCellStyle = useCallback((sheetId, cellId) => {
-    return sheets[sheetId]?.styles?.[cellId] ?? {}
-  }, [sheets])
+    return sheetsRef.current[sheetId]?.styles?.[cellId] ?? {}
+  }, [])
 
   // Set cell value
   const setCellValue = useCallback((sheetId, cellId, value) => {
     saveToHistory()
-    setHasUnsavedChanges(true)
+    markDirty()
     setSheets(prev => ({
       ...prev,
       [sheetId]: {
@@ -436,7 +343,7 @@ export const SpreadsheetProvider = ({ children }) => {
   // Set cell style
   const setCellStyle = useCallback((sheetId, cellId, style) => {
     saveToHistory()
-    setHasUnsavedChanges(true)
+    markDirty()
     setSheets(prev => ({
       ...prev,
       [sheetId]: {
@@ -457,7 +364,7 @@ export const SpreadsheetProvider = ({ children }) => {
     if (selectedCells.length === 0) return
 
     saveToHistory()
-    setHasUnsavedChanges(true)
+    markDirty()
     setSheets(prev => {
       const newStyles = { ...prev[activeSheet]?.styles }
       selectedCells.forEach(cellId => {
@@ -503,7 +410,7 @@ export const SpreadsheetProvider = ({ children }) => {
 
     // Clear original cells
     saveToHistory()
-    setHasUnsavedChanges(true)
+    markDirty()
     setSheets(prev => {
       const newCells = { ...prev[activeSheet]?.cells }
       const newStyles = { ...prev[activeSheet]?.styles }
@@ -535,7 +442,7 @@ export const SpreadsheetProvider = ({ children }) => {
     const rowOffset = targetRow - sourceRow
 
     saveToHistory()
-    setHasUnsavedChanges(true)
+    markDirty()
     setSheets(prev => {
       const newCells = { ...prev[activeSheet]?.cells }
       const newStyles = { ...prev[activeSheet]?.styles }
@@ -566,7 +473,7 @@ export const SpreadsheetProvider = ({ children }) => {
     if (selectedCells.length === 0) return
 
     saveToHistory()
-    setHasUnsavedChanges(true)
+    markDirty()
     setSheets(prev => {
       const newCells = { ...prev[activeSheet]?.cells }
       selectedCells.forEach(cellId => {
@@ -585,7 +492,7 @@ export const SpreadsheetProvider = ({ children }) => {
   // Insert row
   const insertRow = useCallback((afterRow, sheetId = activeSheet) => {
     saveToHistory()
-    setHasUnsavedChanges(true)
+    markDirty()
     setSheets(prev => {
       const sheet = prev[sheetId]
       if (!sheet) return prev
@@ -594,7 +501,16 @@ export const SpreadsheetProvider = ({ children }) => {
       const newStyles = {}
 
       Object.entries(sheet.cells || {}).forEach(([cellId, value]) => {
+        // Handle special meta cells like __vtFormData:N or __vtTechForm:N
+        const metaMatch = cellId.match(/^(__\w+):(\d+)$/)
+        if (metaMatch) {
+          const metaRow = parseInt(metaMatch[2], 10)
+          if (metaRow > afterRow) newCells[`${metaMatch[1]}:${metaRow + 1}`] = value
+          else newCells[cellId] = value
+          return
+        }
         const [col, row] = parseCellId(cellId)
+        if (!col) { newCells[cellId] = value; return }
         if (row > afterRow) {
           newCells[`${col}${row + 1}`] = value
         } else {
@@ -604,6 +520,7 @@ export const SpreadsheetProvider = ({ children }) => {
 
       Object.entries(sheet.styles || {}).forEach(([cellId, style]) => {
         const [col, row] = parseCellId(cellId)
+        if (!col) { newStyles[cellId] = style; return }
         if (row > afterRow) {
           newStyles[`${col}${row + 1}`] = style
         } else {
@@ -625,7 +542,7 @@ export const SpreadsheetProvider = ({ children }) => {
   // Delete row
   const deleteRow = useCallback((row, sheetId = activeSheet) => {
     saveToHistory()
-    setHasUnsavedChanges(true)
+    markDirty()
     setSheets(prev => {
       const sheet = prev[sheetId]
       if (!sheet) return prev
@@ -634,7 +551,17 @@ export const SpreadsheetProvider = ({ children }) => {
       const newStyles = {}
 
       Object.entries(sheet.cells || {}).forEach(([cellId, value]) => {
+        // Handle special meta cells like __vtFormData:N or __vtTechForm:N
+        const metaMatch = cellId.match(/^(__\w+):(\d+)$/)
+        if (metaMatch) {
+          const metaRow = parseInt(metaMatch[2], 10)
+          if (metaRow < row) newCells[cellId] = value
+          else if (metaRow > row) newCells[`${metaMatch[1]}:${metaRow - 1}`] = value
+          // metaRow === row: drop (delete with the row)
+          return
+        }
         const [col, cellRow] = parseCellId(cellId)
+        if (!col) { newCells[cellId] = value; return } // unknown format: keep as-is
         if (cellRow < row) {
           newCells[cellId] = value
         } else if (cellRow > row) {
@@ -644,6 +571,7 @@ export const SpreadsheetProvider = ({ children }) => {
 
       Object.entries(sheet.styles || {}).forEach(([cellId, style]) => {
         const [col, cellRow] = parseCellId(cellId)
+        if (!col) { newStyles[cellId] = style; return }
         if (cellRow < row) {
           newStyles[cellId] = style
         } else if (cellRow > row) {
@@ -665,7 +593,7 @@ export const SpreadsheetProvider = ({ children }) => {
   // Insert column
   const insertColumn = useCallback((afterCol, sheetId = activeSheet) => {
     saveToHistory()
-    setHasUnsavedChanges(true)
+    markDirty()
     setSheets(prev => {
       const sheet = prev[sheetId]
       if (!sheet) return prev
@@ -708,7 +636,7 @@ export const SpreadsheetProvider = ({ children }) => {
   // Delete column
   const deleteColumn = useCallback((col, sheetId = activeSheet) => {
     saveToHistory()
-    setHasUnsavedChanges(true)
+    markDirty()
     setSheets(prev => {
       const sheet = prev[sheetId]
       if (!sheet) return prev
@@ -793,7 +721,7 @@ export const SpreadsheetProvider = ({ children }) => {
       const rows = text.split(/\r?\n/).filter(row => row.length > 0)
 
       saveToHistory()
-      setHasUnsavedChanges(true)
+      markDirty()
       setSheets(prev => {
         const newCells = { ...prev[activeSheet]?.cells }
 
@@ -822,31 +750,62 @@ export const SpreadsheetProvider = ({ children }) => {
     }
   }, [activeSheet, saveToHistory])
 
-  // Manual save trigger
+  // Auto-save: schedule a save 1.5s after the last change
+  const markDirty = useCallback(() => {
+    setHasUnsavedChanges(true)
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveAllSheets()
+    }, 1500)
+  }, [saveAllSheets])
+
+  // Immediate save (used by modals after explicit user actions)
   const saveData = useCallback(async () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = null
+    }
+    // If a save is already running, wait for it to finish before saving
+    // (otherwise saveAllSheets returns false and changes are lost)
+    if (savingRef.current) {
+      await new Promise(resolve => {
+        const check = () => {
+          if (!savingRef.current) resolve()
+          else setTimeout(check, 50)
+        }
+        setTimeout(check, 50)
+      })
+    }
     return await saveAllSheets()
   }, [saveAllSheets])
 
   // Add a VT request to a specific sheet
   const addVTRequest = useCallback((sheetId, data) => {
+    // Use sheetsRef.current (always fresh) to avoid stale state issues
+    const currentSheets = sheetsRef.current
+
     // Initialize sheet if needed
-    if (!sheets[sheetId]) {
+    if (!currentSheets[sheetId]) {
       setSheets(prev => ({
         ...prev,
         [sheetId]: { cells: {}, styles: {} }
       }))
     }
 
-    // Find the first empty row (start from row 1)
-    const sheet = sheets[sheetId] || { cells: {} }
-    let nextRow = 1
-    while (sheet.cells[`A${nextRow}`] || sheet.cells[`B${nextRow}`] || sheet.cells[`C${nextRow}`]) {
-      nextRow++
-      if (nextRow > 1000) break // Safety limit
-    }
+    // Find the first available row >= 2 (fills gaps left by deletions)
+    const sheet = sheetsRef.current[sheetId] || { cells: {} }
+    const usedRows = new Set()
+    Object.keys(sheet.cells).forEach(key => {
+      if (key.startsWith('__')) return
+      if (!sheet.cells[key]) return
+      const m = key.match(/^[A-Z]+(\d+)$/)
+      if (m) { const r = parseInt(m[1]); if (r >= 2) usedRows.add(r) }
+    })
+    let nextRow = 2
+    while (usedRows.has(nextRow)) nextRow++
 
     saveToHistory()
-    setHasUnsavedChanges(true)
+    markDirty()
 
     const colMap = getColumnIdToLetterMap(sheetId)
 
@@ -876,6 +835,8 @@ export const SpreadsheetProvider = ({ children }) => {
         setCell('TELEPHONE', data.vtFormData.tel)
         setCell('EMAIL', data.vtFormData.email)
         setCell('DATE_DDE_VT', data.dateDemandeVT)
+        setCell('ECHEANCE', addDaysToFR(data.dateDemandeVT, 7))
+        setCell('CHARGES_AFFAIRES', data.chargesAffaires)
 
         // Persist full VT form data for PDF generation (survives page reload)
         newCells[`__vtFormData:${nextRow}`] = JSON.stringify(data.vtFormData)
@@ -900,7 +861,139 @@ export const SpreadsheetProvider = ({ children }) => {
 
     // Switch to the target sheet
     setActiveSheet(sheetId)
-  }, [sheets, saveToHistory])
+    return nextRow
+  }, [saveToHistory])
+
+  // Add a contact-only row (no commercial / VT form)
+  const addContactRow = useCallback((sheetId, { clientName, email, adresse, codePostal, commune, tel }) => {
+    if (!sheetsRef.current[sheetId]) {
+      setSheets(prev => ({ ...prev, [sheetId]: { cells: {}, styles: {} } }))
+    }
+    const sheet = sheetsRef.current[sheetId] || { cells: {} }
+    const usedRows2 = new Set()
+    Object.keys(sheet.cells).forEach(key => {
+      if (key.startsWith('__')) return
+      if (!sheet.cells[key]) return
+      const m = key.match(/^[A-Z]+(\d+)$/)
+      if (m) { const r = parseInt(m[1]); if (r >= 2) usedRows2.add(r) }
+    })
+    let nextRow = 2
+    while (usedRows2.has(nextRow)) nextRow++
+    saveToHistory()
+    markDirty()
+    const colMap = getColumnIdToLetterMap(sheetId)
+    setSheets(prev => {
+      const currentSheet = prev[sheetId] || { cells: {}, styles: {} }
+      const newCells = { ...currentSheet.cells }
+      const setCell = (colId, value) => { if (value && colMap[colId]) newCells[`${colMap[colId]}${nextRow}`] = value }
+      const clientCol = sheetId === 'btoc-comptant' ? 'Colonne1' : 'NOM_PRENOM'
+      setCell(clientCol, clientName)
+      setCell('EMAIL', email)
+      setCell('ADRESSE_INSTALLATION', adresse)
+      setCell('CODE_POSTAL', codePostal)
+      setCell('VILLE', commune)
+      setCell('TELEPHONE', tel)
+      return { ...prev, [sheetId]: { ...currentSheet, cells: newCells } }
+    })
+    setActiveSheet(sheetId)
+    return nextRow
+  }, [saveToHistory])
+
+  // Compact all rows of a sheet: move data to rows 2, 3, 4... with no gaps.
+  // Also updates Supabase foreign keys in contact_activities, contact_task_lists, contact_metadata.
+  const compactRows = useCallback(async (sheetId) => {
+    const sheet = sheetsRef.current[sheetId] || { cells: {}, styles: {} }
+
+    // Find all rows that have at least one non-empty non-meta cell
+    const usedRowSet = new Set()
+    Object.entries(sheet.cells).forEach(([key, val]) => {
+      if (key.startsWith('__')) return
+      if (!val) return
+      const m = key.match(/^[A-Z]+(\d+)$/)
+      if (m) { const r = parseInt(m[1]); if (r >= 2) usedRowSet.add(r) }
+    })
+
+    const sortedRows = [...usedRowSet].sort((a, b) => a - b)
+    if (sortedRows.length === 0) return
+
+    // Build old → new mapping; skip if already compact
+    const rowMap = {}
+    let changed = false
+    sortedRows.forEach((oldRow, i) => {
+      const newRow = i + 2
+      rowMap[oldRow] = newRow
+      if (oldRow !== newRow) changed = true
+    })
+    if (!changed) return
+
+    // Rebuild cells & styles with new row numbers
+    const newCells = {}
+    const newStyles = {}
+
+    Object.entries(sheet.cells).forEach(([key, val]) => {
+      const metaM = key.match(/^(__[^:]+):(\d+)$/)
+      if (metaM) {
+        const oldRow = parseInt(metaM[2])
+        const newRow = rowMap[oldRow] ?? oldRow
+        newCells[`${metaM[1]}:${newRow}`] = val
+        return
+      }
+      const m = key.match(/^([A-Z]+)(\d+)$/)
+      if (m) {
+        const oldRow = parseInt(m[2])
+        if (oldRow < 2) { if (val) newCells[key] = val; return }
+        const newRow = rowMap[oldRow] ?? oldRow
+        if (val) newCells[`${m[1]}${newRow}`] = val
+      }
+    })
+
+    Object.entries(sheet.styles || {}).forEach(([key, val]) => {
+      const m = key.match(/^([A-Z]+)(\d+)$/)
+      if (!m) return
+      const oldRow = parseInt(m[2])
+      if (oldRow < 2) { newStyles[key] = val; return }
+      const newRow = rowMap[oldRow] ?? oldRow
+      newStyles[`${m[1]}${newRow}`] = val
+    })
+
+    saveToHistory()
+    markDirty()
+    setSheets(prev => ({ ...prev, [sheetId]: { cells: newCells, styles: newStyles } }))
+
+    // Update Supabase foreign keys
+    const prefix = sheetId === 'btoc-comptant' ? 'c' : sheetId === 'btoc-abonnement' ? 'a' : 'b'
+    const tables = ['contact_activities', 'contact_task_lists', 'contact_metadata']
+    for (const [oldRow, newRow] of Object.entries(rowMap)) {
+      if (parseInt(oldRow) === newRow) continue
+      const oldId = `${prefix}:${oldRow}`
+      const newId = `${prefix}:${newRow}`
+      await Promise.allSettled(tables.map(t => supabase.from(t).update({ contact_id: newId }).eq('contact_id', oldId)))
+    }
+  }, [saveToHistory])
+
+  const clearContactRow = useCallback((sheetId, rowNum) => {
+    saveToHistory()
+    markDirty()
+    setSheets(prev => {
+      const sheet = prev[sheetId]
+      if (!sheet) return prev
+      const newCells  = {}
+      const newStyles = {}
+      Object.entries(sheet.cells  || {}).forEach(([k, v]) => {
+        const meta = k.match(/^(__\w+):(\d+)$/)
+        if (meta) { if (parseInt(meta[2]) !== rowNum) newCells[k] = v; return }
+        const m = k.match(/^([A-Z]+)(\d+)$/)
+        if (m && parseInt(m[2]) === rowNum) return
+        newCells[k] = v
+      })
+      Object.entries(sheet.styles || {}).forEach(([k, v]) => {
+        const m = k.match(/^([A-Z]+)(\d+)$/)
+        if (m && parseInt(m[2]) === rowNum) return
+        newStyles[k] = v
+      })
+      return { ...prev, [sheetId]: { ...sheet, cells: newCells, styles: newStyles } }
+    })
+  }, [saveToHistory])
 
   const value = {
     sheets,
@@ -936,12 +1029,13 @@ export const SpreadsheetProvider = ({ children }) => {
     getRowHeight,
     pasteFromClipboard,
     addVTRequest,
+    addContactRow,
+    clearContactRow,
+    compactRows,
     vtFormData,
     loading,
     saving,
     lastSaved,
-    hasUnsavedChanges,
-    onlineUsers,
     setPendingEdit,
     dataToDisplayLetterMap,
     setDataToDisplayLetterMap,
