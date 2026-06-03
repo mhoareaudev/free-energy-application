@@ -1046,7 +1046,7 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
   }
 
   const sendVTValidatedEmail = async () => {
-    const appUrl = import.meta.env.VITE_APP_URL || 'http://localhost:5173'
+    const appUrl = import.meta.env.VITE_APP_URL || 'https://app.free-energy.re'
     const clientName = nom || '—'
     const techName   = [userProfile?.prenom, userProfile?.nom].filter(Boolean).join(' ') || '—'
     const adresseComplete = [adresse, codePostal, ville].filter(Boolean).join(', ') || '—'
@@ -1301,7 +1301,7 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
 
   const sendCAAssignmentEmail = async (caFullName, caEmail) => {
     if (!caEmail) return
-    const appUrl = import.meta.env.VITE_APP_URL || 'http://localhost:5173'
+    const appUrl = import.meta.env.VITE_APP_URL || 'https://app.free-energy.re'
     const clientName = nom || '—'
     const adresseComplete = [adresse, codePostal, ville].filter(Boolean).join(', ') || '—'
     const html = `<!DOCTYPE html>

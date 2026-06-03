@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const FROM_EMAIL     = Deno.env.get('FROM_EMAIL')     ?? 'Free Energy <noreply@free-energy.re>'
-const APP_URL        = Deno.env.get('APP_URL')        ?? 'http://localhost:5173'
+const APP_URL        = Deno.env.get('APP_URL')        ?? 'https://app.free-energy.re'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',

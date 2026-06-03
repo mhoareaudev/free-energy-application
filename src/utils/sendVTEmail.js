@@ -1,6 +1,6 @@
 import { supabaseGet, supabasePost, supabaseInvoke } from '../lib/supabase'
 
-const APP_URL = import.meta.env.VITE_APP_URL || 'http://localhost:5173'
+const APP_URL = import.meta.env.VITE_APP_URL || 'https://app.free-energy.re'
 
 function buildVTEmailHtml(vars) {
   const nom = vars.nom_client || '—'
