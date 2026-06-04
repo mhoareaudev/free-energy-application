@@ -327,91 +327,105 @@
 }
 
 @media (max-width: 768px) {
+
+  /* ── Container ── */
   .dashboard {
-    padding: 16px 14px;
-    gap: 14px;
+    padding: 12px;
+    gap: 12px;
   }
 
-  .dash-title { font-size: 18px; }
+  /* ── Header ── */
+  .dash-header { flex-direction: column; gap: 8px; align-items: flex-start; }
+  .dash-title  { font-size: 18px; }
+  .dash-date   { font-size: 11px; }
+  .dash-role-badge { font-size: 11px; padding: 4px 10px; }
 
-  .dash-kpi-grid {
+  /* ── Tabs ── */
+  .dash-tabs { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .dash-tab  { font-size: 12px; padding: 6px 12px; white-space: nowrap; }
+
+  /* ── Toutes les grilles de charts → 1 colonne ── */
+  .dash-charts-row,
+  .dash-charts-row--3 {
+    grid-template-columns: 1fr;
+  }
+
+  /* ── KPI grids ── */
+  .dash-kpi-grid,
+  .dash-kpi-grid--4,
+  .dash-kpi-grid--5 {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
 
-  .dash-kpi-card {
-    padding: 14px 12px;
-    gap: 10px;
-    border-radius: 12px;
-  }
-
-  .dash-kpi-icon { width: 36px; height: 36px; border-radius: 10px; }
-
-  .dash-kpi-value { font-size: 20px; }
-
+  .dash-kpi-card  { padding: 12px; gap: 10px; border-radius: 12px; }
+  .dash-kpi-icon  { width: 34px; height: 34px; border-radius: 9px; }
+  .dash-kpi-value { font-size: 19px; }
   .dash-kpi-label { font-size: 10px; }
+  .dash-kpi-sub   { font-size: 10px; }
 
-  .dash-card { padding: 14px 16px; border-radius: 12px; gap: 12px; }
+  /* ── Cards ── */
+  .dash-card { padding: 12px 14px; border-radius: 12px; gap: 10px; }
 
-  .dash-hbar-row { grid-template-columns: 80px 1fr 24px; gap: 8px; }
+  /* ── Courbe line chart ── */
+  .dash-line-svg { aspect-ratio: 2 / 1; }
 
-  .dash-hbar-name { font-size: 11px; }
+  /* ── Barres horizontales ── */
+  .dash-hbar-row        { grid-template-columns: 90px 1fr 28px; gap: 6px; }
+  .dash-hbar-row--wide  { grid-template-columns: 80px 1fr 28px; }
+  .dash-hbar-name       { font-size: 11px; }
+  .dash-hbar-val        { font-size: 11px; }
+  .dash-hbar-conv, .dash-hbar-ca { display: none; }
 
-  /* Email grid en 2 colonnes sur mobile */
-  .dash-email-grid { grid-template-columns: repeat(2, 1fr); }
-  .dash-email-grid--4 { grid-template-columns: repeat(2, 1fr); }
+  /* ── Camembert ── */
+  .dash-camembert        { flex-direction: row; flex-wrap: wrap; gap: 12px; justify-content: center; }
+  .dash-camembert-svg    { width: 130px; height: 130px; }
+  .dash-camembert-legend { min-width: 130px; gap: 5px; }
+  .dash-camembert-lbl    { font-size: 11px; }
+  .dash-camembert-val    { font-size: 12px; }
+  .dash-camembert-dot    { width: 8px; height: 8px; }
 
-  /* Mini liste des poses : texte plus compact */
+  /* ── Mini liste ── */
   .dash-mini-name { font-size: 12px; }
-  .dash-mini-meta { font-size: 11px; }
+  .dash-mini-meta { font-size: 10.5px; }
 
-  /* Refresh button plus compact */
-  .dash-refresh-btn { padding: 5px 10px; font-size: 11px; }
+  /* ── Mini table transactions ── */
+  .dash-mini-tx-btn { font-size: 11px; }
+  .dash-mini-tx-table { font-size: 11px; }
+  .dash-mini-tx-table thead th { font-size: 9px; padding: 4px 6px; }
+  .dash-mini-tx-table tbody td { padding: 6px 6px; }
+  .dash-mini-tx-name { max-width: 90px; font-size: 11px; }
+  .dash-mini-tx-stage { font-size: 9.5px; padding: 1px 5px; }
+  .dash-mini-tx-ca { font-size: 10.5px; max-width: 70px; }
 
-  /* Stats list (suivi technique / finance) */
-  .dash-stat-label { font-size: 12px; }
-  .dash-stat-val   { font-size: 13px; }
+  /* ── Email grid ── */
+  .dash-email-grid,
+  .dash-email-grid--4 { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .dash-email-card { padding: 12px; gap: 10px; }
+  .dash-email-icon { width: 32px; height: 32px; border-radius: 8px; }
 
-  /* Grilles de charts : 1 colonne */
-  .dash-charts-row,
-  .dash-charts-row--3 { grid-template-columns: 1fr; }
+  /* ── Stats list ── */
+  .dash-stat-row  { padding: 6px 2px; }
+  .dash-stat-label{ font-size: 11.5px; }
+  .dash-stat-val  { font-size: 13px; }
 
-  /* KPI grids 4 et 5 colonnes → 2 colonnes */
-  .dash-kpi-grid--4,
-  .dash-kpi-grid--5 { grid-template-columns: repeat(2, 1fr); }
+  /* ── Section header ── */
+  .dash-section-header { font-size: 11px; }
+  .dash-refresh-btn    { padding: 4px 10px; font-size: 11px; }
 
-  /* Tabs du dashboard */
-  .dash-tabs { width: 100%; overflow-x: auto; }
-  .dash-tab  { font-size: 12px; padding: 6px 12px; }
+  /* ── Alertes ── */
+  .dash-alert-banner { font-size: 11.5px; padding: 10px 12px; }
+  .dash-alert-chip   { font-size: 10px; padding: 2px 8px; }
+  .dash-alert-chips  { gap: 4px; }
 
-  /* Camembert : empiler SVG + légende */
-  .dash-camembert { flex-direction: column; align-items: center; gap: 12px; }
-  .dash-camembert-svg { width: 140px; height: 140px; }
-  .dash-camembert-legend { width: 100%; }
-  .dash-camembert-lbl { font-size: 11px; }
-  .dash-camembert-val { font-size: 12px; }
+  /* ── Funnel ── */
+  .dash-funnel-label { font-size: 11px; }
+  .dash-funnel-count { font-size: 12px; }
 
-  /* Mini table transactions : scroll horizontal */
-  .dash-mini-tx-table { font-size: 11.5px; }
-  .dash-mini-tx-table thead th { font-size: 9.5px; padding: 5px 8px; }
-  .dash-mini-tx-table tbody td { padding: 7px 8px; }
-  .dash-mini-tx-name { max-width: 100px; }
-  .dash-mini-tx-ca   { font-size: 11px; max-width: 80px; }
-  .dash-mini-tx-btn  { font-size: 11px; }
-
-  /* Hbar rows plus compact */
-  .dash-hbar-row--wide { grid-template-columns: 80px 1fr 28px 36px; }
-  .dash-hbar-ca { font-size: 10px; min-width: 44px; }
-
-  /* Alert banner */
-  .dash-alert-banner { font-size: 12px; padding: 10px 12px; }
-  .dash-alert-chip   { font-size: 10px; }
-
-  /* Overview section labels */
-  .dash-overview-label { font-size: 10px; }
-
-  /* Role badge */
-  .dash-role-badge { font-size: 11px; padding: 4px 10px; }
+  /* ── Bar chart vertical ── */
+  .dash-bar-chart { height: 100px; }
+  .dash-bar-label { font-size: 8px; }
+  .dash-bar-val   { font-size: 9px; }
 }
 
 /* ── Email stats section ── */
@@ -871,4 +885,19 @@
 }
 @media (max-width: 900px) {
   .dash-kpi-grid--5 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Mobile overrides (doivent être APRÈS les définitions de classes) ── */
+@media (max-width: 768px) {
+  .dash-kpi-grid,
+  .dash-kpi-grid--4,
+  .dash-kpi-grid--5 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px;
+  }
+
+  .dash-charts-row,
+  .dash-charts-row--3 {
+    grid-template-columns: 1fr !important;
+  }
 }
