@@ -16,6 +16,7 @@ import Tickets from './pages/Tickets'
 import Dashboard from './pages/Dashboard'
 import Mailing from './pages/Mailing'
 import AssistantAdmin from './pages/AssistantAdmin'
+import Calendrier from './pages/Calendrier'
 import AssistantChat from './components/AssistantChat'
 import Contacts from './pages/dossiers/Contacts'
 import Entreprises from './pages/dossiers/Entreprises'
@@ -88,6 +89,7 @@ function AppContent() {
 
               {activePage === 'nomenclatures' && <NomenclatureStock />}
               {activePage === 'tickets'       && <Tickets />}
+              {activePage === 'calendrier'       && <Calendrier />}
               {activePage === 'mailing'         && <Mailing />}
               {activePage === 'assistant-admin' && <AssistantAdmin />}
             </div>

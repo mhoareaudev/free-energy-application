@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, FolderOpen, Package, LogOut, User, Shield, Users, Building2, Zap, Table2, Ticket, Megaphone, Mail, Bot } from 'lucide-react'
+import { LayoutDashboard, FolderOpen, Package, LogOut, User, Shield, Users, Building2, Zap, Table2, Ticket, Megaphone, Mail, Bot, CalendarDays } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import './Sidebar.css'
 
-const DOSSIERS_PAGES = new Set(['contacts', 'entreprises', 'transactions', 'tickets', 'dossiers'])
+const DOSSIERS_PAGES = new Set(['contacts', 'entreprises', 'transactions', 'tickets', 'dossiers', 'calendrier'])
 const MARKETING_PAGES = new Set(['mailing', 'assistant-admin'])
 
 const DOSSIERS_SUBITEMS = [
   { id: 'contacts',      label: 'Contacts',      icon: Users },
   { id: 'entreprises',   label: 'Entreprises',   icon: Building2 },
   { id: 'transactions',  label: 'Transactions',  icon: Zap },
-  { id: 'tickets',       label: 'Tickets',       icon: Ticket, separator: true },
+  { id: 'calendrier',   label: 'Calendrier',    icon: CalendarDays },
+  { id: 'tickets',      label: 'Tickets',       icon: Ticket, separator: true },
   { id: 'dossiers',      label: 'Vue tableau',   icon: Table2, noMobile: true },
 ]
 
