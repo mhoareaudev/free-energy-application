@@ -72,7 +72,7 @@ function AppContent() {
             <TopBar onOpenAssistant={() => setShowAssistant(p => !p)} />
 
             <div className="app-content">
-              {activePage === 'dashboard' && <Dashboard />}
+              {activePage === 'dashboard' && <Dashboard onNavigate={setActivePage} />}
 
               {activePage === 'contacts'         && <Contacts />}
               {activePage === 'entreprises'      && <Entreprises />}

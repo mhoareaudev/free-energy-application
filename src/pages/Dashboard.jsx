@@ -8,6 +8,7 @@ import {
 import { useSpreadsheet } from '../context/SpreadsheetContext'
 import { useAuth, ROLES } from '../context/AuthContext'
 import { getColumnIdToLetterMap } from '../data/sheetsConfig'
+import { STAGE_COLOR_MAP } from '../data/stagesConfig'
 import { supabaseInvoke } from '../lib/supabase'
 import './Dashboard.css'
 
@@ -158,8 +159,8 @@ function useDashboardData(loggedInName, role) {
       .slice(0, 8)
 
     const etatMap = {}
-    allRows.filter(r => r.signeLe && !r.dateReellePose).forEach(r => {
-      const e = r.etatDossier || 'Non défini'; etatMap[e]=(etatMap[e]||0)+1
+    allRows.filter(r => !r.dateReellePose).forEach(r => {
+      const e = r.etatDossier || 'Demande de VT'; etatMap[e]=(etatMap[e]||0)+1
     })
     const etatBreakdown = Object.entries(etatMap).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([label,count])=>({label,count}))
 
@@ -192,9 +193,15 @@ function useDashboardData(loggedInName, role) {
     const caEnCours            = allRows.filter(r => r.signeLe && !r.dateReellePose)
                                         .reduce((s,r) => s + (r.totalTTC || r.montantAbt), 0)
 
+    // Mini table pour le tableau de bord technique (5 dossiers en cours)
+    const miniRows = allRows
+      .filter(r => !r.dateReellePose)
+      .slice(0, 5)
+
     return {
       totalDossiers, posesDone, tauxPoses, totalCA, totalKWc,
       pipeline, monthly, commerciaux, contacts,
+      miniRows,
       awaitingVT: awaitingVTList.length, awaitingVTList: awaitingVTList.slice(0,8),
       vtThisWeek: vtThisWeek.length,
       vtOverdue: vtOverdueList.length, vtOverdueList: vtOverdueList.slice(0,5),
@@ -250,6 +257,65 @@ function BarChart({ data, color='#f97316' }) {
           <span className="dash-bar-label">{d.label}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+function EtatPills({ data }) {
+  const total = data.reduce((s, d) => s + d.count, 0)
+  if (!total) return null
+
+  const SIZE = 160, cx = SIZE / 2, cy = SIZE / 2, R = 68, r = 44
+
+  // Convertir en segments de cercle (coordonnées polaires → cartésiennes)
+  const toXY = (angle, radius) => ({
+    x: cx + radius * Math.cos(angle),
+    y: cy + radius * Math.sin(angle),
+  })
+
+  const segments = []
+  let startAngle = -Math.PI / 2
+
+  data.forEach((d, i) => {
+    const color = STAGE_COLOR_MAP[d.label] || '#64748b'
+    const sweep = (d.count / total) * 2 * Math.PI
+    const endAngle = startAngle + sweep
+
+    if (data.length === 1) {
+      // Cas dégénéré : un seul segment = cercle complet
+      segments.push({ color, count: d.count, label: d.label,
+        path: `M ${cx} ${cy - R} A ${R} ${R} 0 1 1 ${cx - 0.001} ${cy - R} Z` })
+    } else {
+      const s = toXY(startAngle, R)
+      const e = toXY(endAngle, R)
+      const large = sweep > Math.PI ? 1 : 0
+      segments.push({ color, count: d.count, label: d.label,
+        path: `M ${cx} ${cy} L ${s.x} ${s.y} A ${R} ${R} 0 ${large} 1 ${e.x} ${e.y} Z` })
+    }
+    startAngle += sweep
+  })
+
+  return (
+    <div className="dash-camembert">
+      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="dash-camembert-svg">
+        {segments.map((s, i) => (
+          <path key={i} d={s.path} fill={s.color} stroke="#fff" strokeWidth="2" />
+        ))}
+        <circle cx={cx} cy={cy} r={r} fill="#fff" />
+        <text x={cx} y={cy - 5} textAnchor="middle" dominantBaseline="middle"
+          fontSize="20" fontWeight="800" fill="#0f172a">{total}</text>
+        <text x={cx} y={cy + 14} textAnchor="middle"
+          fontSize="9" fill="#94a3b8">dossiers</text>
+      </svg>
+      <div className="dash-camembert-legend">
+        {segments.map((s, i) => (
+          <div key={i} className="dash-camembert-item">
+            <span className="dash-camembert-dot" style={{ background: s.color }} />
+            <span className="dash-camembert-lbl">{s.label}</span>
+            <span className="dash-camembert-val" style={{ color: s.color }}>{s.count}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -357,7 +423,7 @@ function EmailCard({ icon: Icon, label, value, sub, color, loading }) {
 
 
 // ── Dashboard ─────────────────────────────────────────────────
-export default function Dashboard() {
+export default function Dashboard({ onNavigate }) {
   const { userProfile } = useAuth()
   const role         = userProfile?.role || ''
   const loggedInName = [userProfile?.prenom, userProfile?.nom].filter(Boolean).join(' ')
@@ -365,8 +431,10 @@ export default function Dashboard() {
   const data = useDashboardData(loggedInName, role)
   const { stats: emailStats, loading: emailLoading, refresh: emailRefresh, refreshing } = useEmailStats()
 
-  const isCommercial = role === ROLES.COMMERCIAL
-  const isTechnique  = role === ROLES.TECHNIQUE
+  const isCommercial   = role === ROLES.COMMERCIAL
+  const isTechnique    = role === ROLES.TECHNIQUE
+  const isAdministratif = role === ROLES.ADMINISTRATIF
+  const useTechView    = isTechnique || isAdministratif
   const today = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
 
   // ── Section: Commercial ──────────────────────────────────────
@@ -377,14 +445,14 @@ export default function Dashboard() {
           sub={isCommercial ? 'Mes dossiers' : 'Tous sheets confondus'} color="#6366f1" />
         <KpiCard icon={Hammer}    label="Posés"           value={data.posesDone}
           sub={`${data.tauxPoses} % des dossiers`} color="#10b981" />
-        {!isTechnique && <KpiCard icon={Euro} label="CA total" value={data.totalCA > 0 ? fmtEUR(data.totalCA) : '—'}
+        {!useTechView && <KpiCard icon={Euro} label="CA total" value={data.totalCA > 0 ? fmtEUR(data.totalCA) : '—'}
           sub="Total TTC" color="#8b5cf6" />}
         <KpiCard icon={Zap}       label="kWc installés"   value={data.totalKWc > 0 ? `${data.totalKWc.toFixed(1)} kWc` : '—'}
           sub="Puissance réalisée" color="#f97316" />
       </div>
 
       <div className="dash-charts-row">
-        {!isTechnique && (
+        {!useTechView && (
           <div className="dash-card dash-card--wide">
             <div className="dash-card-header">
               <Activity size={15} /><span>Dossiers ouverts par mois</span><span className="dash-card-sub">12 derniers mois</span>
@@ -394,7 +462,7 @@ export default function Dashboard() {
               : <LineChart data={data.monthly} />}
           </div>
         )}
-        <div className={`dash-card${isTechnique ? ' dash-card--wide' : ''}`}>
+        <div className={`dash-card${useTechView ? ' dash-card--wide' : ''}`}>
           <div className="dash-card-header"><BarChart2 size={15} /><span>Pipeline</span></div>
           {data.pipeline.every(p=>p.count===0)
             ? <div className="dash-empty">Aucun dossier</div>
@@ -402,7 +470,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {!isCommercial && !isTechnique && (
+      {!isCommercial && !useTechView && (
         <div className="dash-charts-row">
           <div className="dash-card dash-card--wide">
             <div className="dash-card-header">
@@ -499,7 +567,7 @@ export default function Dashboard() {
           <div className="dash-card-header"><ClipboardList size={15} /><span>État des dossiers</span></div>
           {data.etatBreakdown.length === 0
             ? <div className="dash-empty">Aucun dossier en cours</div>
-            : <HBarChart data={data.etatBreakdown} color="#f59e0b" />}
+            : <EtatPills data={data.etatBreakdown} />}
         </div>
       </div>
 
@@ -638,47 +706,106 @@ export default function Dashboard() {
       )}
 
       {/* Ligne 1 : KPIs clés — tout en un */}
-      <div className="dash-kpi-grid dash-kpi-grid--5">
+      <div className={`dash-kpi-grid${useTechView ? ' dash-kpi-grid--4' : ' dash-kpi-grid--5'}`}>
         <KpiCard icon={FolderOpen}  label="Clients"           value={data.totalDossiers}
           sub="Tous dossiers confondus" color="#6366f1" />
         <KpiCard icon={Hammer}      label="Posés"             value={data.posesDone}
           sub={`${data.tauxPoses} % des dossiers terminés`} color="#10b981" />
-        {!isTechnique && <KpiCard icon={Euro} label="CA total" value={data.totalCA > 0 ? fmtEUR(data.totalCA) : '—'} sub="Total TTC" color="#8b5cf6" />}
-        {isTechnique && <KpiCard icon={Clock} label="Temps moyen / dossier" value={data.avgDays !== null ? `${data.avgDays} j` : '—'} sub="De la demande VT à la pose" color="#8b5cf6" />}
+        {!useTechView && <KpiCard icon={Euro} label="CA total" value={data.totalCA > 0 ? fmtEUR(data.totalCA) : '—'} sub="Total TTC" color="#8b5cf6" />}
+        {useTechView && <KpiCard icon={Clock} label="Temps moyen / dossier" value={data.avgDays !== null ? `${data.avgDays} j` : '—'} sub="De la demande VT à la pose" color="#8b5cf6" />}
         <KpiCard icon={Clock}       label="En attente de VT"  value={data.awaitingVT}
           sub={`${data.vtThisWeek} prévues cette semaine`} color="#f59e0b" alert={data.vtOverdue>0} />
-        <KpiCard icon={CreditCard}  label="Reste à encaisser" value={data.totalResteEncaisser>0 ? fmtEUR(data.totalResteEncaisser) : '—'}
-          sub="En cours de règlement" color="#ef4444" />
       </div>
 
       {/* ── Vue TECHNIQUE ── */}
-      {isTechnique && <>
-        {/* T-Ligne 2 : État des dossiers + Prochaines poses */}
-        <div className="dash-charts-row">
-          <div className="dash-card dash-card--wide">
-            <div className="dash-card-header"><ClipboardList size={15} /><span>État des dossiers</span><span className="dash-card-sub">par étape</span></div>
-            {data.etatBreakdown.length===0 ? <div className="dash-empty">Aucun dossier en cours</div> : <HBarChart data={data.etatBreakdown} color="#f59e0b" />}
+      {useTechView && <>
+        {/* T-Ligne 2 : État des dossiers + Charge techniciens + Prochaines poses */}
+        <div className="dash-charts-row dash-charts-row--3">
+          <div className="dash-card">
+            <div className="dash-card-header"><ClipboardList size={15} /><span>État des dossiers</span></div>
+            {data.etatBreakdown.length===0 ? <div className="dash-empty">Aucun dossier en cours</div> : <EtatPills data={data.etatBreakdown} />}
+          </div>
+          <div className="dash-card">
+            <div className="dash-card-header"><Users size={15} /><span>Charge par technicien</span></div>
+            {data.techniciens.length === 0 ? (
+              <div className="dash-empty">Aucun technicien assigné</div>
+            ) : (
+              <div className="dash-hbar-chart">
+                {data.techniciens.map((t, i) => (
+                  <div key={i} className="dash-hbar-row">
+                    <span className="dash-hbar-name">{t.name}</span>
+                    <div className="dash-hbar-track">
+                      <div className="dash-hbar-fill" style={{ width:`${(t.count/Math.max(...data.techniciens.map(x=>x.count),1))*100}%`, background:'#6366f1' }} />
+                    </div>
+                    <span className="dash-hbar-val">{t.count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="dash-card">
             <div className="dash-card-header"><Calendar size={15} /><span>Prochaines poses</span></div>
             <MiniList rows={data.nextPoses.map(r=>({ nom:r.nom, meta:r.datePrevPose, badge:r.poseur||r.chargesAffaires||undefined, badgeColor:'#6366f1' }))} emptyText="Aucune pose planifiée" />
           </div>
         </div>
-        {/* T-Ligne 3 : Suivi technique */}
+        {/* T-Ligne 3 : Mini table des transactions en cours */}
         <div className="dash-card">
-          <div className="dash-card-header"><Wrench size={15} /><span>Suivi technique</span></div>
-          <div className="dash-stat-list">
-            <div className="dash-stat-row"><span className="dash-stat-label">En attente de VT</span><span className="dash-stat-val" style={data.vtOverdue>0?{color:'#ef4444'}:{}}>{data.awaitingVT}</span></div>
-            <div className="dash-stat-row"><span className="dash-stat-label">VTs cette semaine</span><span className="dash-stat-val">{data.vtThisWeek}</span></div>
-            <div className="dash-stat-row"><span className="dash-stat-label">DP à lancer</span><span className="dash-stat-val">{data.dpPending}</span></div>
-            <div className="dash-stat-row"><span className="dash-stat-label">Poses à planifier</span><span className="dash-stat-val">{data.posesToPlan}</span></div>
-            <div className="dash-stat-row"><span className="dash-stat-label">VTs en retard (+21j)</span><span className="dash-stat-val" style={{color:'#ef4444'}}>{data.vtOverdue}</span></div>
+          <div className="dash-card-header" style={{ justifyContent: 'space-between' }}>
+            <span style={{ display:'flex', alignItems:'center', gap:7 }}><Wrench size={15} /><span>Dossiers en cours</span></span>
+            <button
+              className="dash-mini-tx-btn"
+              onClick={() => onNavigate?.('transactions')}
+            >
+              Voir tous les dossiers →
+            </button>
           </div>
+          {data.miniRows.length === 0 ? (
+            <div className="dash-empty">Aucun dossier en cours</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="dash-mini-tx-table">
+                <thead>
+                  <tr>
+                    <th>Client</th>
+                    <th>Type</th>
+                    <th>Commercial</th>
+                    <th>Date demande VT</th>
+                    <th>Date fermeture</th>
+                    <th>Étape</th>
+                    <th>Chargé d'affaires</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.miniRows.map((r, i) => (
+                    <tr key={i} style={{ cursor: 'pointer' }} onClick={() => {
+                      sessionStorage.setItem('pendingTxId', r.id)
+                      onNavigate?.('transactions')
+                    }}>
+                      <td className="dash-mini-tx-name">{r.nom || '—'}</td>
+                      <td className="dash-mini-tx-ca">{r.type || '—'}</td>
+                      <td className="dash-mini-tx-ca">{r.commercial || '—'}</td>
+                      <td className="dash-mini-tx-ca">{r.dateDdeVT || '—'}</td>
+                      <td className="dash-mini-tx-ca">{r.signeLe || '—'}</td>
+                      <td>
+                        <span className="dash-mini-tx-stage" style={{
+                          background: (STAGE_COLOR_MAP[r.etatDossier] || '#64748b') + '20',
+                          color: STAGE_COLOR_MAP[r.etatDossier] || '#64748b',
+                        }}>
+                          {r.etatDossier || 'Demande de VT'}
+                        </span>
+                      </td>
+                      <td className="dash-mini-tx-ca">{r.chargesAffaires || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </>}
 
       {/* ── Vue NON-TECHNIQUE ── */}
-      {!isTechnique && <>
+      {!useTechView && <>
         {/* Ligne 2 : courbe + pipeline */}
         <div className="dash-charts-row">
           <div className="dash-card dash-card--wide">
@@ -713,7 +840,7 @@ export default function Dashboard() {
           </div>
           <div className="dash-card">
             <div className="dash-card-header"><ClipboardList size={15} /><span>État des dossiers</span></div>
-            {data.etatBreakdown.length===0 ? <div className="dash-empty">Aucun dossier en cours</div> : <HBarChart data={data.etatBreakdown} color="#f59e0b" />}
+            {data.etatBreakdown.length===0 ? <div className="dash-empty">Aucun dossier en cours</div> : <EtatPills data={data.etatBreakdown} />}
           </div>
         </div>
         {/* Ligne 4 : suivi technique + finance + origine */}

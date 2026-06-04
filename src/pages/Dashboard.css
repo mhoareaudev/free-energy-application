@@ -371,6 +371,47 @@
   /* Stats list (suivi technique / finance) */
   .dash-stat-label { font-size: 12px; }
   .dash-stat-val   { font-size: 13px; }
+
+  /* Grilles de charts : 1 colonne */
+  .dash-charts-row,
+  .dash-charts-row--3 { grid-template-columns: 1fr; }
+
+  /* KPI grids 4 et 5 colonnes → 2 colonnes */
+  .dash-kpi-grid--4,
+  .dash-kpi-grid--5 { grid-template-columns: repeat(2, 1fr); }
+
+  /* Tabs du dashboard */
+  .dash-tabs { width: 100%; overflow-x: auto; }
+  .dash-tab  { font-size: 12px; padding: 6px 12px; }
+
+  /* Camembert : empiler SVG + légende */
+  .dash-camembert { flex-direction: column; align-items: center; gap: 12px; }
+  .dash-camembert-svg { width: 140px; height: 140px; }
+  .dash-camembert-legend { width: 100%; }
+  .dash-camembert-lbl { font-size: 11px; }
+  .dash-camembert-val { font-size: 12px; }
+
+  /* Mini table transactions : scroll horizontal */
+  .dash-mini-tx-table { font-size: 11.5px; }
+  .dash-mini-tx-table thead th { font-size: 9.5px; padding: 5px 8px; }
+  .dash-mini-tx-table tbody td { padding: 7px 8px; }
+  .dash-mini-tx-name { max-width: 100px; }
+  .dash-mini-tx-ca   { font-size: 11px; max-width: 80px; }
+  .dash-mini-tx-btn  { font-size: 11px; }
+
+  /* Hbar rows plus compact */
+  .dash-hbar-row--wide { grid-template-columns: 80px 1fr 28px 36px; }
+  .dash-hbar-ca { font-size: 10px; min-width: 44px; }
+
+  /* Alert banner */
+  .dash-alert-banner { font-size: 12px; padding: 10px 12px; }
+  .dash-alert-chip   { font-size: 10px; }
+
+  /* Overview section labels */
+  .dash-overview-label { font-size: 10px; }
+
+  /* Role badge */
+  .dash-role-badge { font-size: 11px; padding: 4px 10px; }
 }
 
 /* ── Email stats section ── */
@@ -632,6 +673,123 @@
   border-radius: 99px;
 }
 
+/* ── Camembert État des dossiers ── */
+.dash-camembert {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.dash-camembert-svg {
+  width: 180px;
+  height: 180px;
+  flex-shrink: 0;
+}
+
+.dash-camembert-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.dash-camembert-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.dash-camembert-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dash-camembert-lbl {
+  font-size: 12px;
+  color: #475569;
+  flex: 1;
+}
+
+.dash-camembert-val {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ── Mini transaction table ── */
+.dash-mini-tx-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6366f1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.dash-mini-tx-btn:hover { text-decoration: underline; }
+
+.dash-mini-tx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dash-mini-tx-table thead th {
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.dash-mini-tx-table tbody tr {
+  border-bottom: 1px solid #f8fafc;
+  transition: background 0.1s;
+}
+
+.dash-mini-tx-table tbody tr:last-child { border-bottom: none; }
+.dash-mini-tx-table tbody tr:hover { background: #f8fafc; }
+
+.dash-mini-tx-table tbody td {
+  padding: 9px 10px;
+  vertical-align: middle;
+}
+
+.dash-mini-tx-name {
+  font-weight: 600;
+  color: #1e293b;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-mini-tx-stage {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+.dash-mini-tx-ca {
+  color: #64748b;
+  font-size: 12px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Stat list (technique / finance compact) ── */
 .dash-stat-list {
   display: flex;
@@ -699,7 +857,11 @@
   width: fit-content;
 }
 
-/* ── 5-column KPI grid ── */
+/* ── 4/5-column KPI grid ── */
+.dash-kpi-grid--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .dash-kpi-grid--5 {
   grid-template-columns: repeat(5, 1fr);
 }

@@ -726,8 +726,12 @@ export default function Transactions() {
   const [showAdd,             setShowAdd]             = useState(false)
   const [searchQuery,         setSearchQuery]         = useState('')
   const [toast,               setToast]               = useState(null)
-  const [activeTransactionId, setActiveTransactionId] = useState(null)
-  const [view,                setView]                = useState('table')
+  const [activeTransactionId, setActiveTransactionId] = useState(() => {
+    const pending = sessionStorage.getItem('pendingTxId')
+    if (pending) { sessionStorage.removeItem('pendingTxId'); return pending }
+    return null
+  })
+  const [view, setView] = useState('table')
 
   const showToast = msg => { setToast(msg); setTimeout(() => setToast(null), 3000) }
   const [pipelineName, setPipelineName] = useState(
