@@ -1240,3 +1240,79 @@
   flex-shrink: 0;
 }
 .cd-rp-attachment-dl:hover { color: #ea580c; }
+
+/* ══════════════════════════════════════════
+   MOBILE — ContactDetail
+   ══════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* Breadcrumb */
+  .cd-breadcrumb { padding: 10px 14px; }
+  .cd-back-btn   { font-size: 12px; }
+  .cd-actions-btn { font-size: 12px; padding: 5px 10px; }
+
+  /* Body : empiler les 3 colonnes verticalement */
+  .cd-body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  /* Left panel : largeur auto, pas de border-right */
+  .cd-left {
+    width: 100%;
+    min-width: unset;
+    border-right: none;
+    border-bottom: 1px solid #e8edf2;
+    overflow-y: visible;
+  }
+
+  /* Card contact plus compacte */
+  .cd-contact-card {
+    padding: 16px 14px;
+    gap: 12px;
+  }
+
+  .cd-avatar-block { flex-direction: row; gap: 12px; }
+  .cd-avatar       { width: 48px; height: 48px; font-size: 16px; }
+  .cd-name         { font-size: 17px; }
+
+  /* Info section */
+  .cd-info-section { padding: 0 14px 14px; }
+
+  /* Middle panel : pleine largeur, hauteur auto */
+  .cd-middle {
+    flex: none;
+    height: 420px;
+    border-bottom: 1px solid #e8edf2;
+  }
+
+  /* Tabs : scrollables */
+  .cd-act-tabs    { overflow-x: auto; }
+  .cd-act-tab     { font-size: 12px; padding: 10px 12px; white-space: nowrap; }
+  .cd-act-timeline { padding: 12px 14px; }
+
+  /* Right panel : pleine largeur, pas de border-left */
+  .cd-right {
+    width: 100%;
+    min-width: unset;
+    border-left: none;
+    overflow-y: visible;
+  }
+
+  /* Sections du panel droit */
+  .cd-rp-section  { border-bottom: 1px solid #f1f5f9; }
+  .cd-rp-header   { padding: 12px 14px 10px; }
+  .cd-rp-body     { padding: 8px 14px 12px; }
+
+  /* Masquer actions menu dropdown sur mobile (sinon débordement) */
+  .cd-actions-menu {
+    right: 0;
+    left: auto;
+  }
+
+  /* Notes : hauteur fixe raisonnable */
+  .cd-act-timeline--notes { height: 420px; }
+
+  /* Tâches */
+  .cd-tasks-panel { padding: 12px 0; }
+}
