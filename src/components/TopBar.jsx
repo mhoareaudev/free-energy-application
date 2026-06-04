@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext'
 import { useNotifications } from '../context/NotificationContext'
 import './TopBar.css'
 
-export default function TopBar() {
+export default function TopBar({ onOpenAssistant }) {
   const navigate = useNavigate()
   const { userProfile, user, signOut } = useAuth()
   const {
@@ -57,6 +57,9 @@ export default function TopBar() {
     .filter(Boolean).map(s => s[0]?.toUpperCase() || '').join('')
   const fullName = [userProfile?.prenom, userProfile?.nom].filter(Boolean).join(' ')
 
+  const role = userProfile?.role || ''
+  const canSeeAdminIcons = role === 'marketing' || role === 'administrateur'
+
   return (
     <header className="topbar">
 
@@ -77,13 +80,15 @@ export default function TopBar() {
 
         {/* Icon group */}
         <div className="topbar-icon-group">
-          <button className="topbar-icon-btn topbar-icon-btn--mob-hide" title="Appels"><Phone size={15} /></button>
-          <button className="topbar-icon-btn topbar-icon-btn--mob-hide" title="Messages"><MessageSquare size={15} /></button>
-          <button className="topbar-icon-btn" title="Aide"><HelpCircle size={15} /></button>
-          <button className="topbar-icon-btn" title="Paramètres" onClick={() => navigate('/pipeline')}><Settings size={15} /></button>
+          {canSeeAdminIcons && <>
+            <button className="topbar-icon-btn topbar-icon-btn--mob-hide" title="Appels"><Phone size={15} /></button>
+            <button className="topbar-icon-btn topbar-icon-btn--mob-hide" title="Messages"><MessageSquare size={15} /></button>
+            <button className="topbar-icon-btn" title="Aide"><HelpCircle size={15} /></button>
+            <button className="topbar-icon-btn" title="Paramètres" onClick={() => navigate('/pipeline')}><Settings size={15} /></button>
+          </>}
 
           {/* Notifications */}
-          <div className="topbar-notif-wrap" ref={notifRef}>
+          {canSeeAdminIcons && <div className="topbar-notif-wrap" ref={notifRef}>
             <button
               className="topbar-icon-btn topbar-icon-btn--notif"
               onClick={handleOpenNotifications}
@@ -146,13 +151,13 @@ export default function TopBar() {
                 )}
               </div>
             )}
-          </div>
+          </div>}
         </div>
 
         <div className="topbar-sep" />
 
         {/* Assistant */}
-        <button className="topbar-assistant-btn">
+        <button className="topbar-assistant-btn" onClick={onOpenAssistant}>
           <Sparkles size={13} />
           Assistant
         </button>

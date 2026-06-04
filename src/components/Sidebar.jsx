@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, FolderOpen, Package, LogOut, User, Shield, Users, Building2, Zap, Table2, Ticket, Megaphone, Mail } from 'lucide-react'
+import { LayoutDashboard, FolderOpen, Package, LogOut, User, Shield, Users, Building2, Zap, Table2, Ticket, Megaphone, Mail, Bot } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import './Sidebar.css'
 
 const DOSSIERS_PAGES = new Set(['contacts', 'entreprises', 'transactions', 'tickets', 'dossiers'])
-const MARKETING_PAGES = new Set(['mailing'])
+const MARKETING_PAGES = new Set(['mailing', 'assistant-admin'])
 
 const DOSSIERS_SUBITEMS = [
   { id: 'contacts',      label: 'Contacts',      icon: Users },
@@ -15,11 +15,14 @@ const DOSSIERS_SUBITEMS = [
 ]
 
 const MARKETING_SUBITEMS = [
-  { id: 'mailing', label: 'Mailing', icon: Mail },
+  { id: 'mailing',          label: 'Mailing',    icon: Mail },
+  { id: 'assistant-admin',  label: 'Assistant',  icon: Bot  },
 ]
 
 export default function Sidebar({ activePage, setActivePage, onOpenAdmin }) {
   const { userProfile, signOut, isAdmin } = useAuth()
+  const role = userProfile?.role || ''
+  const canSeeMarketing = role === 'marketing' || role === 'administrateur'
 
   const [isMobile,       setIsMobile]       = useState(() => window.innerWidth <= 768)
   const [dossiersOpen,   setDossiersOpen]   = useState(false)
@@ -127,8 +130,8 @@ export default function Sidebar({ activePage, setActivePage, onOpenAdmin }) {
           <span className="sidebar-tooltip">Nomenclatures</span>
         </button>
 
-        {/* Marketing — submenu flyout */}
-        <div
+        {/* Marketing — submenu flyout (marketing + administrateur uniquement) */}
+        {canSeeMarketing && <div
           ref={marketingRef}
           className={`sidebar-dossiers-wrap${marketingOpen ? ' sidebar-dossiers-wrap--open' : ''}`}
         >
@@ -154,7 +157,7 @@ export default function Sidebar({ activePage, setActivePage, onOpenAdmin }) {
               )
             })}
           </div>
-        </div>
+        </div>}
 
       </nav>
 

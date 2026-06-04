@@ -164,7 +164,8 @@ const EMPTY_FORM = {
   typeClient: 'btoc', typeContrat: 'comptant',
   puissance: '', adresse: '', codePostal: '', commune: '',
   email: '', tel: '',
-  reventeSurplus: '', contratMaintenance: '', batterie: '', priseSécurisée: '',
+  reventeSurplus: '', contratMaintenance: '', batterie: '',
+  ond3kva: 0, ond5kva: 0, ond6kva: 0, ond8kva: 0, ond9kva: 0,
 }
 
 function getTargetSheet(formData) {
@@ -234,7 +235,11 @@ function AddContactPanel({ onClose, onCreated }) {
           reventeSurplus: formData.reventeSurplus,
           contratMaintenance: formData.contratMaintenance,
           batterie: formData.batterie,
-          priseSécurisée: formData.priseSécurisée,
+          ond3kva: formData.ond3kva || 0,
+          ond5kva: formData.ond5kva || 0,
+          ond6kva: formData.ond6kva || 0,
+          ond8kva: formData.ond8kva || 0,
+          ond9kva: formData.ond9kva || 0,
         }
 
         const nextRow = addVTRequest(targetSheet, {
@@ -421,6 +426,18 @@ function AddContactPanel({ onClose, onCreated }) {
                 <input type="text" name="puissance" value={formData.puissance} onChange={handleChange} placeholder="Ex: 3, 6, 9..." disabled={!formData.commercial} />
               </div>
 
+              <div className="form-group">
+                <label>Onduleurs</label>
+                <div className="form-onduleurs">
+                  {[['ond3kva','3 kVa'],['ond5kva','5 kVa'],['ond6kva','6 kVa'],['ond8kva','8 kVa'],['ond9kva','9 kVa']].map(([name, label]) => (
+                    <div key={name} className="form-ond-item">
+                      <span className="form-ond-label">{label}</span>
+                      <input type="number" min="0" name={name} value={formData[name]} onChange={handleChange} disabled={!formData.commercial} className="form-ond-input" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="form-row">
                 <div className="form-group">
                   <label>AC avec revente du surplus</label>
@@ -443,11 +460,11 @@ function AddContactPanel({ onClose, onCreated }) {
               <div className="form-row">
                 <div className="form-group">
                   <label>Batterie</label>
-                  <input type="text" name="batterie" value={formData.batterie} onChange={handleChange} placeholder="Batterie" disabled={!formData.commercial} />
-                </div>
-                <div className="form-group">
-                  <label>Prise sécurisée</label>
-                  <input type="text" name="priseSécurisée" value={formData.priseSécurisée} onChange={handleChange} placeholder="Prise sécurisée" disabled={!formData.commercial} />
+                  <select name="batterie" value={formData.batterie} onChange={handleChange} disabled={!formData.commercial}>
+                    <option value="">-</option>
+                    <option value="oui">Oui</option>
+                    <option value="non">Non</option>
+                  </select>
                 </div>
               </div>
 

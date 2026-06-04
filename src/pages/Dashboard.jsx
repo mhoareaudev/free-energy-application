@@ -79,8 +79,8 @@ function useDashboardData(loggedInName, role) {
       })
     }
 
-    const isCommercial = role === ROLES.COMMERCIAL
-    const rows = isCommercial && loggedInName
+    const isCommercial = role === ROLES.COMMERCIAL && !!loggedInName
+    const rows = isCommercial
       ? allRows.filter(r => r.commercial?.toLowerCase().trim() === loggedInName.toLowerCase().trim())
       : allRows
 
@@ -172,6 +172,19 @@ function useDashboardData(loggedInName, role) {
     const techniciens = Object.entries(techMap).sort((a,b)=>b[1].total-a[1].total).slice(0,6)
       .map(([name,d])=>({ name, count: d.total, done: d.done }))
 
+    // ── Temps moyen par dossier (DATE_DDE_VT → DATE_REELLE_POSE) ──
+    const durations = allRows
+      .filter(r => r.dateDdeVT && r.dateReellePose)
+      .map(r => {
+        const d1 = parseDateFR(r.dateDdeVT)
+        const d2 = parseDateFR(r.dateReellePose)
+        return d1 && d2 ? Math.round((d2 - d1) / 86400000) : null
+      })
+      .filter(d => d !== null && d >= 0)
+    const avgDays = durations.length > 0
+      ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length)
+      : null
+
     // ── Admin/Finance ──
     const totalResteEncaisser  = allRows.reduce((s,r) => s + (r.signeLe ? r.resteEncaisser : 0), 0)
     const dossiersAvecFin      = allRows.filter(r => r.signeLe && r.financement).length
@@ -189,6 +202,7 @@ function useDashboardData(loggedInName, role) {
       posesToPlan: posesToPlan.length,
       nextPoses,
       etatBreakdown, techniciens,
+      avgDays,
       totalResteEncaisser, dossiersAvecFin, dossiersAttenteAdmin, caEnCours,
     }
   }, [sheets, loggedInName, role])
@@ -345,13 +359,14 @@ function EmailCard({ icon: Icon, label, value, sub, color, loading }) {
 // ── Dashboard ─────────────────────────────────────────────────
 export default function Dashboard() {
   const { userProfile } = useAuth()
-  const role         = userProfile?.role || ROLES.COMMERCIAL
+  const role         = userProfile?.role || ''
   const loggedInName = [userProfile?.prenom, userProfile?.nom].filter(Boolean).join(' ')
 
   const data = useDashboardData(loggedInName, role)
   const { stats: emailStats, loading: emailLoading, refresh: emailRefresh, refreshing } = useEmailStats()
 
   const isCommercial = role === ROLES.COMMERCIAL
+  const isTechnique  = role === ROLES.TECHNIQUE
   const today = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
 
   // ── Section: Commercial ──────────────────────────────────────
@@ -362,22 +377,24 @@ export default function Dashboard() {
           sub={isCommercial ? 'Mes dossiers' : 'Tous sheets confondus'} color="#6366f1" />
         <KpiCard icon={Hammer}    label="Posés"           value={data.posesDone}
           sub={`${data.tauxPoses} % des dossiers`} color="#10b981" />
-        <KpiCard icon={Euro}      label="CA total"        value={data.totalCA > 0 ? fmtEUR(data.totalCA) : '—'}
-          sub="Total TTC" color="#8b5cf6" />
+        {!isTechnique && <KpiCard icon={Euro} label="CA total" value={data.totalCA > 0 ? fmtEUR(data.totalCA) : '—'}
+          sub="Total TTC" color="#8b5cf6" />}
         <KpiCard icon={Zap}       label="kWc installés"   value={data.totalKWc > 0 ? `${data.totalKWc.toFixed(1)} kWc` : '—'}
           sub="Puissance réalisée" color="#f97316" />
       </div>
 
       <div className="dash-charts-row">
-        <div className="dash-card dash-card--wide">
-          <div className="dash-card-header">
-            <Activity size={15} /><span>Dossiers ouverts par mois</span><span className="dash-card-sub">12 derniers mois</span>
+        {!isTechnique && (
+          <div className="dash-card dash-card--wide">
+            <div className="dash-card-header">
+              <Activity size={15} /><span>Dossiers ouverts par mois</span><span className="dash-card-sub">12 derniers mois</span>
+            </div>
+            {data.monthly.every(m=>m.count===0)
+              ? <div className="dash-empty">Aucune signature enregistrée</div>
+              : <LineChart data={data.monthly} />}
           </div>
-          {data.monthly.every(m=>m.count===0)
-            ? <div className="dash-empty">Aucune signature enregistrée</div>
-            : <LineChart data={data.monthly} />}
-        </div>
-        <div className="dash-card">
+        )}
+        <div className={`dash-card${isTechnique ? ' dash-card--wide' : ''}`}>
           <div className="dash-card-header"><BarChart2 size={15} /><span>Pipeline</span></div>
           {data.pipeline.every(p=>p.count===0)
             ? <div className="dash-empty">Aucun dossier</div>
@@ -385,7 +402,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {!isCommercial && (
+      {!isCommercial && !isTechnique && (
         <div className="dash-charts-row">
           <div className="dash-card dash-card--wide">
             <div className="dash-card-header">
@@ -626,55 +643,28 @@ export default function Dashboard() {
           sub="Tous dossiers confondus" color="#6366f1" />
         <KpiCard icon={Hammer}      label="Posés"             value={data.posesDone}
           sub={`${data.tauxPoses} % des dossiers terminés`} color="#10b981" />
-        <KpiCard icon={Euro}        label="CA total"          value={data.totalCA > 0 ? fmtEUR(data.totalCA) : '—'}
-          sub="Total TTC" color="#8b5cf6" />
+        {!isTechnique && <KpiCard icon={Euro} label="CA total" value={data.totalCA > 0 ? fmtEUR(data.totalCA) : '—'} sub="Total TTC" color="#8b5cf6" />}
+        {isTechnique && <KpiCard icon={Clock} label="Temps moyen / dossier" value={data.avgDays !== null ? `${data.avgDays} j` : '—'} sub="De la demande VT à la pose" color="#8b5cf6" />}
         <KpiCard icon={Clock}       label="En attente de VT"  value={data.awaitingVT}
           sub={`${data.vtThisWeek} prévues cette semaine`} color="#f59e0b" alert={data.vtOverdue>0} />
         <KpiCard icon={CreditCard}  label="Reste à encaisser" value={data.totalResteEncaisser>0 ? fmtEUR(data.totalResteEncaisser) : '—'}
           sub="En cours de règlement" color="#ef4444" />
       </div>
 
-      {/* Ligne 2 : courbe + pipeline */}
-      <div className="dash-charts-row">
-        <div className="dash-card dash-card--wide">
-          <div className="dash-card-header"><Activity size={15} /><span>Dossiers ouverts par mois</span><span className="dash-card-sub">12 derniers mois</span></div>
-          {data.monthly.every(m=>m.count===0) ? <div className="dash-empty">Aucune signature</div> : <LineChart data={data.monthly} />}
+      {/* ── Vue TECHNIQUE ── */}
+      {isTechnique && <>
+        {/* T-Ligne 2 : État des dossiers + Prochaines poses */}
+        <div className="dash-charts-row">
+          <div className="dash-card dash-card--wide">
+            <div className="dash-card-header"><ClipboardList size={15} /><span>État des dossiers</span><span className="dash-card-sub">par étape</span></div>
+            {data.etatBreakdown.length===0 ? <div className="dash-empty">Aucun dossier en cours</div> : <HBarChart data={data.etatBreakdown} color="#f59e0b" />}
+          </div>
+          <div className="dash-card">
+            <div className="dash-card-header"><Calendar size={15} /><span>Prochaines poses</span></div>
+            <MiniList rows={data.nextPoses.map(r=>({ nom:r.nom, meta:r.datePrevPose, badge:r.poseur||r.chargesAffaires||undefined, badgeColor:'#6366f1' }))} emptyText="Aucune pose planifiée" />
+          </div>
         </div>
-        <div className="dash-card">
-          <div className="dash-card-header"><BarChart2 size={15} /><span>Pipeline global</span></div>
-          {data.pipeline.every(p=>p.count===0) ? <div className="dash-empty">Aucun dossier</div> : <FunnelChart data={data.pipeline} />}
-        </div>
-      </div>
-
-      {/* Ligne 3 : commerciaux + état technique */}
-      <div className="dash-charts-row">
-        <div className="dash-card dash-card--wide">
-          <div className="dash-card-header"><Users size={15} /><span>Performance commerciaux</span><span className="dash-card-sub">dossiers · % posés · CA</span></div>
-          {data.commerciaux.length === 0 ? <div className="dash-empty">Aucune donnée</div> : (
-            <div className="dash-hbar-chart">
-              {data.commerciaux.map((d,i) => {
-                const maxC = Math.max(...data.commerciaux.map(x=>x.count),1)
-                return (
-                  <div key={i} className="dash-hbar-row dash-hbar-row--wide">
-                    <span className="dash-hbar-name">{d.name}</span>
-                    <div className="dash-hbar-track"><div className="dash-hbar-fill" style={{ width:`${(d.count/maxC)*100}%`, background:'#f97316' }} /></div>
-                    <span className="dash-hbar-val">{d.count}</span>
-                    <span className="dash-hbar-conv">{d.conv}%</span>
-                    <span className="dash-hbar-ca">{d.ca>0?fmtEUR(d.ca):'—'}</span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-        <div className="dash-card">
-          <div className="dash-card-header"><ClipboardList size={15} /><span>État des dossiers</span></div>
-          {data.etatBreakdown.length===0 ? <div className="dash-empty">Aucun dossier en cours</div> : <HBarChart data={data.etatBreakdown} color="#f59e0b" />}
-        </div>
-      </div>
-
-      {/* Ligne 4 : KPIs technique + finance côte à côte */}
-      <div className="dash-charts-row">
+        {/* T-Ligne 3 : Suivi technique */}
         <div className="dash-card">
           <div className="dash-card-header"><Wrench size={15} /><span>Suivi technique</span></div>
           <div className="dash-stat-list">
@@ -685,43 +675,96 @@ export default function Dashboard() {
             <div className="dash-stat-row"><span className="dash-stat-label">VTs en retard (+21j)</span><span className="dash-stat-val" style={{color:'#ef4444'}}>{data.vtOverdue}</span></div>
           </div>
         </div>
-        <div className="dash-card">
-          <div className="dash-card-header"><CreditCard size={15} /><span>Finance</span></div>
-          <div className="dash-stat-list">
-            <div className="dash-stat-row"><span className="dash-stat-label">CA signé total</span><span className="dash-stat-val">{data.totalCA>0?fmtEUR(data.totalCA):'—'}</span></div>
-            <div className="dash-stat-row"><span className="dash-stat-label">CA en cours (non posés)</span><span className="dash-stat-val">{data.caEnCours>0?fmtEUR(data.caEnCours):'—'}</span></div>
-            <div className="dash-stat-row"><span className="dash-stat-label">Reste à encaisser</span><span className="dash-stat-val" style={{color:'#ef4444'}}>{data.totalResteEncaisser>0?fmtEUR(data.totalResteEncaisser):'—'}</span></div>
-            <div className="dash-stat-row"><span className="dash-stat-label">Avec financement</span><span className="dash-stat-val">{data.dossiersAvecFin}</span></div>
-            <div className="dash-stat-row"><span className="dash-stat-label">En attente d'admin (BDC)</span><span className="dash-stat-val" style={data.dossiersAttenteAdmin>5?{color:'#f59e0b'}:{}}>{data.dossiersAttenteAdmin}</span></div>
-          </div>
-        </div>
-        <div className="dash-card">
-          <div className="dash-card-header"><Target size={15} /><span>Origine des clients</span></div>
-          {data.contacts.length===0 ? <div className="dash-empty">Aucune donnée</div> : <HBarChart data={data.contacts} color="#6366f1" />}
-        </div>
-      </div>
+      </>}
 
-      {/* Ligne 5 : prochaines poses + email stats */}
-      <div className="dash-charts-row">
-        <div className="dash-card">
-          <div className="dash-card-header"><Calendar size={15} /><span>Prochaines poses</span></div>
-          <MiniList rows={data.nextPoses.map(r=>({ nom:r.nom, meta:r.datePrevPose, badge:r.poseur||r.chargesAffaires||undefined, badgeColor:'#6366f1' }))} emptyText="Aucune pose planifiée" />
-        </div>
-        <div className="dash-card dash-card--wide">
-          <div className="dash-card-header">
-            <Mail size={15} /><span>Emails — Demandes de VT</span>
-            <button className={`dash-refresh-btn${refreshing?' dash-refresh-btn--spinning':''}`} onClick={emailRefresh} disabled={refreshing} style={{ marginLeft:'auto' }}>
-              <RefreshCw size={13} />{refreshing?'Actualisation…':'Actualiser'}
-            </button>
+      {/* ── Vue NON-TECHNIQUE ── */}
+      {!isTechnique && <>
+        {/* Ligne 2 : courbe + pipeline */}
+        <div className="dash-charts-row">
+          <div className="dash-card dash-card--wide">
+            <div className="dash-card-header"><Activity size={15} /><span>Dossiers ouverts par mois</span><span className="dash-card-sub">12 derniers mois</span></div>
+            {data.monthly.every(m=>m.count===0) ? <div className="dash-empty">Aucune signature</div> : <LineChart data={data.monthly} />}
           </div>
-          <div className="dash-email-grid dash-email-grid--4">
-            <EmailCard icon={Mail}        label="Emails envoyés"   loading={emailLoading} value={emailStats?.total}     sub={emailStats?`${emailStats.totalRecipients} destinataires`:null} color="#6366f1" />
-            <EmailCard icon={CheckCircle} label="Délivrés"         loading={emailLoading} value={emailStats?.delivered} sub={emailStats?.total>0?`${Math.round((emailStats.delivered/emailStats.total)*100)} %`:null} color="#10b981" />
-            <EmailCard icon={MailOpen}    label="Ouverts"          loading={emailLoading} value={emailStats?.opened}    sub={emailStats?.delivered>0?`${Math.round((emailStats.opened/emailStats.delivered)*100)} %`:null} color="#f97316" />
-            <EmailCard icon={TrendingUp}  label="Taux délivraison" loading={emailLoading} value={emailStats?.total>0?`${Math.round((emailStats.delivered/emailStats.total)*100)} %`:emailStats?'—':null} sub="Délivrés / envoyés" color="#0ea5e9" />
+          <div className="dash-card">
+            <div className="dash-card-header"><BarChart2 size={15} /><span>Pipeline global</span></div>
+            {data.pipeline.every(p=>p.count===0) ? <div className="dash-empty">Aucun dossier</div> : <FunnelChart data={data.pipeline} />}
           </div>
         </div>
-      </div>
+        {/* Ligne 3 : commerciaux + état */}
+        <div className="dash-charts-row">
+          <div className="dash-card dash-card--wide">
+            <div className="dash-card-header"><Users size={15} /><span>Performance commerciaux</span><span className="dash-card-sub">dossiers · % posés · CA</span></div>
+            {data.commerciaux.length === 0 ? <div className="dash-empty">Aucune donnée</div> : (
+              <div className="dash-hbar-chart">
+                {data.commerciaux.map((d,i) => {
+                  const maxC = Math.max(...data.commerciaux.map(x=>x.count),1)
+                  return (
+                    <div key={i} className="dash-hbar-row dash-hbar-row--wide">
+                      <span className="dash-hbar-name">{d.name}</span>
+                      <div className="dash-hbar-track"><div className="dash-hbar-fill" style={{ width:`${(d.count/maxC)*100}%`, background:'#f97316' }} /></div>
+                      <span className="dash-hbar-val">{d.count}</span>
+                      <span className="dash-hbar-conv">{d.conv}%</span>
+                      <span className="dash-hbar-ca">{d.ca>0?fmtEUR(d.ca):'—'}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+          <div className="dash-card">
+            <div className="dash-card-header"><ClipboardList size={15} /><span>État des dossiers</span></div>
+            {data.etatBreakdown.length===0 ? <div className="dash-empty">Aucun dossier en cours</div> : <HBarChart data={data.etatBreakdown} color="#f59e0b" />}
+          </div>
+        </div>
+        {/* Ligne 4 : suivi technique + finance + origine */}
+        <div className="dash-charts-row">
+          <div className="dash-card">
+            <div className="dash-card-header"><Wrench size={15} /><span>Suivi technique</span></div>
+            <div className="dash-stat-list">
+              <div className="dash-stat-row"><span className="dash-stat-label">En attente de VT</span><span className="dash-stat-val" style={data.vtOverdue>0?{color:'#ef4444'}:{}}>{data.awaitingVT}</span></div>
+              <div className="dash-stat-row"><span className="dash-stat-label">VTs cette semaine</span><span className="dash-stat-val">{data.vtThisWeek}</span></div>
+              <div className="dash-stat-row"><span className="dash-stat-label">DP à lancer</span><span className="dash-stat-val">{data.dpPending}</span></div>
+              <div className="dash-stat-row"><span className="dash-stat-label">Poses à planifier</span><span className="dash-stat-val">{data.posesToPlan}</span></div>
+              <div className="dash-stat-row"><span className="dash-stat-label">VTs en retard (+21j)</span><span className="dash-stat-val" style={{color:'#ef4444'}}>{data.vtOverdue}</span></div>
+            </div>
+          </div>
+          <div className="dash-card">
+            <div className="dash-card-header"><CreditCard size={15} /><span>Finance</span></div>
+            <div className="dash-stat-list">
+              <div className="dash-stat-row"><span className="dash-stat-label">CA signé total</span><span className="dash-stat-val">{data.totalCA>0?fmtEUR(data.totalCA):'—'}</span></div>
+              <div className="dash-stat-row"><span className="dash-stat-label">CA en cours (non posés)</span><span className="dash-stat-val">{data.caEnCours>0?fmtEUR(data.caEnCours):'—'}</span></div>
+              <div className="dash-stat-row"><span className="dash-stat-label">Reste à encaisser</span><span className="dash-stat-val" style={{color:'#ef4444'}}>{data.totalResteEncaisser>0?fmtEUR(data.totalResteEncaisser):'—'}</span></div>
+              <div className="dash-stat-row"><span className="dash-stat-label">Avec financement</span><span className="dash-stat-val">{data.dossiersAvecFin}</span></div>
+              <div className="dash-stat-row"><span className="dash-stat-label">En attente d'admin (BDC)</span><span className="dash-stat-val" style={data.dossiersAttenteAdmin>5?{color:'#f59e0b'}:{}}>{data.dossiersAttenteAdmin}</span></div>
+            </div>
+          </div>
+          <div className="dash-card">
+            <div className="dash-card-header"><Target size={15} /><span>Origine des clients</span></div>
+            {data.contacts.length===0 ? <div className="dash-empty">Aucune donnée</div> : <HBarChart data={data.contacts} color="#6366f1" />}
+          </div>
+        </div>
+        {/* Ligne 5 : prochaines poses + emails */}
+        <div className="dash-charts-row">
+          <div className="dash-card">
+            <div className="dash-card-header"><Calendar size={15} /><span>Prochaines poses</span></div>
+            <MiniList rows={data.nextPoses.map(r=>({ nom:r.nom, meta:r.datePrevPose, badge:r.poseur||r.chargesAffaires||undefined, badgeColor:'#6366f1' }))} emptyText="Aucune pose planifiée" />
+          </div>
+          <div className="dash-card dash-card--wide">
+            <div className="dash-card-header">
+              <Mail size={15} /><span>Emails — Demandes de VT</span>
+              <button className={`dash-refresh-btn${refreshing?' dash-refresh-btn--spinning':''}`} onClick={emailRefresh} disabled={refreshing} style={{ marginLeft:'auto' }}>
+                <RefreshCw size={13} />{refreshing?'Actualisation…':'Actualiser'}
+              </button>
+            </div>
+            <div className="dash-email-grid dash-email-grid--4">
+              <EmailCard icon={Mail}        label="Emails envoyés"   loading={emailLoading} value={emailStats?.total}     sub={emailStats?`${emailStats.totalRecipients} destinataires`:null} color="#6366f1" />
+              <EmailCard icon={CheckCircle} label="Délivrés"         loading={emailLoading} value={emailStats?.delivered} sub={emailStats?.total>0?`${Math.round((emailStats.delivered/emailStats.total)*100)} %`:null} color="#10b981" />
+              <EmailCard icon={MailOpen}    label="Ouverts"          loading={emailLoading} value={emailStats?.opened}    sub={emailStats?.delivered>0?`${Math.round((emailStats.opened/emailStats.delivered)*100)} %`:null} color="#f97316" />
+              <EmailCard icon={TrendingUp}  label="Taux délivraison" loading={emailLoading} value={emailStats?.total>0?`${Math.round((emailStats.delivered/emailStats.total)*100)} %`:emailStats?'—':null} sub="Délivrés / envoyés" color="#0ea5e9" />
+            </div>
+          </div>
+        </div>
+      </>}
     </>
   )
 

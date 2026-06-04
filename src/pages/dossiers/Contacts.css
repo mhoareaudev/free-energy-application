@@ -138,6 +138,48 @@
   display: block;
 }
 
+/* ── Onduleurs ── */
+.form-onduleurs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.form-ond-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-ond-label {
+  font-size: 12.5px;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.form-ond-input {
+  width: 70px;
+  padding: 5px 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.form-ond-input:focus { border-color: #3b82f6; }
+.form-ond-input:disabled { background: #f8fafc; }
+
+/* Garder les flèches natives du champ number visibles */
+.form-ond-input::-webkit-inner-spin-button,
+.form-ond-input::-webkit-outer-spin-button {
+  opacity: 1;
+}
+
 /* ── Badge contact importé depuis ilio ── */
 .ct-ilio-badge {
   display: inline-flex;

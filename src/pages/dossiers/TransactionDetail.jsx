@@ -142,9 +142,9 @@ function stageCompleted(key, cells, colMap, rowNum, sheetId) {
   }
 }
 
-function firstIncompleteStage(cells, colMap, rowNum, sheetId) {
+function firstIncompleteStage(cells, colMap, rowNum, sheetId, validatedMap = {}) {
   for (const s of STAGES) {
-    if (!stageCompleted(s.key, cells, colMap, rowNum, sheetId)) return s.key
+    if (!validatedMap[s.key]) return s.key
   }
   return STAGES[STAGES.length - 1].key
 }
@@ -1043,6 +1043,20 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
       // Email aux administratifs pour lancer la DP
       sendVTValidatedEmail()
     }
+
+    if (stageKey === 'nomenclature') {
+      // Sync date de validation nomenclature vers vt_requests
+      const today = new Date().toISOString().split('T')[0]
+      supabaseGet('vt_requests', { contact_id: `eq.${transactionId}`, select: 'id' })
+        .then(rows => {
+          if (rows?.[0]?.id) {
+            supabaseUpsert('vt_requests', {
+              id: rows[0].id,
+              nomenclature_validated_at: today,
+            }, 'id').catch(() => {})
+          }
+        }).catch(() => {})
+    }
   }
 
   const sendVTValidatedEmail = async () => {
@@ -1152,7 +1166,7 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
     try { return JSON.parse(cells[`__cancelled:${rowNum}`] || 'null') } catch { return null }
   }, [cells, rowNum])
 
-  const [openStage,        setOpenStage]        = useState(() => firstIncompleteStage(cells, colMap, rowNum, sheetId))
+  const [openStage,        setOpenStage]        = useState(() => firstIncompleteStage(cells, colMap, rowNum, sheetId, {}))
   const [showVtModal,      setShowVtModal]      = useState(false)
   const [activities,       setActivities]       = useState([])
   const [actMenuOpen,      setActMenuOpen]      = useState(false)
@@ -1239,7 +1253,7 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
 
   // Auto-write ETAT_DOSSIER = current stage label (or "Annulé")
   // Ne pas écrire si la ligne est vide (contact supprimé)
-  const computedEtat = cancelled ? 'Annulé' : (STAGES.find(s => s.key === firstIncompleteStage(cells, colMap, rowNum, sheetId))?.label ?? '')
+  const computedEtat = cancelled ? 'Annulé' : (STAGES.find(s => s.key === firstIncompleteStage(cells, colMap, rowNum, sheetId, validatedMap))?.label ?? '')
   useEffect(() => {
     const letter = colMap['ETAT_DOSSIER']
     if (!letter) return

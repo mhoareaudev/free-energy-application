@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
-import { supabase, supabaseUrl, supabaseAnonKey } from '../lib/supabase'
+import { supabase, supabaseUrl, supabaseAnonKey, getFreshToken } from '../lib/supabase'
 import { getColumnIdToLetterMap } from '../data/sheetsConfig'
 import { addDaysToFR } from '../utils/dateUtils'
 import { useAuth } from './AuthContext'
@@ -48,25 +48,50 @@ export const SpreadsheetProvider = ({ children }) => {
   const historyRef = useRef([])
   const historyIndexRef = useRef(-1)
 
-  // Load data from Supabase on mount
+  // Cache auth token — se met à jour à chaque changement d'état auth
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      tokenRef.current = session?.access_token || null
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // Charger les sheets UNIQUEMENT quand l'utilisateur est authentifié
+  // Le tableau de dépendances [user] garantit le rechargement après login
+  useEffect(() => {
+    if (!user) {
+      setLoading(false)
+      return
+    }
+
     const loadSheets = async () => {
       try {
         setLoading(true)
-        const { data, error } = await supabase
-          .from('sheets')
-          .select('*')
 
-        if (error) {
-          console.error('Error loading sheets:', error)
+        // Utiliser getFreshToken pour éviter le blocage du client Supabase JS
+        const token = await getFreshToken()
+        const res = await fetch(
+          `${supabaseUrl}/rest/v1/sheets?select=*`,
+          {
+            headers: {
+              'apikey':        supabaseAnonKey,
+              'Authorization': `Bearer ${token}`,
+              'Content-Type':  'application/json',
+            },
+          }
+        )
+
+        if (!res.ok) {
+          console.error('Error loading sheets:', res.status, await res.text())
           return
         }
 
-        if (data && data.length > 0) {
+        const data = await res.json()
+        if (Array.isArray(data) && data.length > 0) {
           const loadedSheets = {}
           data.forEach(sheet => {
             loadedSheets[sheet.sheet_id] = {
-              cells: sheet.data || {},
+              cells:  sheet.data   || {},
               styles: sheet.styles || {},
             }
           })
@@ -80,18 +105,7 @@ export const SpreadsheetProvider = ({ children }) => {
     }
 
     loadSheets()
-  }, [])
-
-  // Cache auth token so save path never needs to call supabase.auth.getSession()
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      tokenRef.current = session?.access_token || null
-    })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      tokenRef.current = session?.access_token || null
-    })
-    return () => subscription.unsubscribe()
-  }, [])
+  }, [user])
 
 
   // Ref always in sync with sheets — updated synchronously inside every setSheets call

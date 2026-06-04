@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, getFreshToken, supabaseUrl, supabaseAnonKey } from '../lib/supabase'
 
 const AuthContext = createContext({})
 
@@ -20,44 +20,59 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // No persistent session - start with loading false
-    setLoading(false)
+    let ready = false
 
-    // Listen for auth changes (login/logout)
+    // onAuthStateChange envoie INITIAL_SESSION au démarrage (session persistée ou null)
+    // C'est le seul endroit où on gère tout — pas besoin d'un getSession() séparé
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setUser(session?.user ?? null)
+
         if (session?.user) {
           await fetchUserProfile(session.user.id)
         } else {
           setUserProfile(null)
         }
+
+        // Premier événement = état initial connu → fin du chargement
+        if (!ready) {
+          ready = true
+          setLoading(false)
+        }
       }
     )
 
-    return () => subscription.unsubscribe()
+    // Failsafe : si onAuthStateChange ne répond pas en 3s, on débloque quand même
+    const failsafe = setTimeout(() => { if (!ready) { ready = true; setLoading(false) } }, 3000)
+
+    return () => { subscription.unsubscribe(); clearTimeout(failsafe) }
   }, [])
 
   const fetchUserProfile = async (userId) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      if (error) throw error
-      setUserProfile(data)
+      // Utiliser getFreshToken + fetch direct pour éviter les blocages du client JS
+      const token = await getFreshToken()
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=*&limit=1`,
+        {
+          headers: {
+            'apikey':        supabaseAnonKey,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type':  'application/json',
+          },
+        }
+      )
+      if (!res.ok) throw new Error(`Profile fetch failed: ${res.status}`)
+      const data = await res.json()
+      if (data?.[0]) {
+        setUserProfile(data[0])
+      } else {
+        console.warn('Profil introuvable pour userId:', userId)
+        setUserProfile(null)
+      }
     } catch (error) {
       console.error('Error fetching user profile:', error)
-      // Set default profile for demo purposes
-      setUserProfile({
-        id: userId,
-        nom: 'Demo',
-        prenom: 'User',
-        role: ROLES.ADMINISTRATEUR,
-        identifiant: 'demo@free-energy.fr',
-      })
+      setUserProfile(null) // Ne pas forcer un rôle arbitraire
     }
   }
 

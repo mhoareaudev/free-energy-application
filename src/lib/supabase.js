@@ -6,8 +6,9 @@ export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-a
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: false, // Ne pas persister la session - connexion requise à chaque visite
-    autoRefreshToken: true, // Keep token fresh during active session
+    persistSession: true,   // Session persistée en localStorage → pas besoin de se reconnecter
+    autoRefreshToken: true, // Renouvellement automatique du token
+    storageKey: 'fe-session',
   },
 })
 
@@ -30,7 +31,7 @@ supabase.auth.onAuthStateChange((_event, session) => {
 export const getAuthToken = () => _cachedToken || supabaseAnonKey
 
 /** Returns a fresh JWT, refreshing if expired. Races against a 4s timeout. */
-const getFreshToken = async () => {
+export const getFreshToken = async () => {
   // Check if cached token is still valid for at least 60s
   if (_cachedToken) {
     try {

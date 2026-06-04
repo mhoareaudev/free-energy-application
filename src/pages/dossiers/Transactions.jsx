@@ -6,8 +6,9 @@ import {
 } from 'lucide-react'
 import { useSpreadsheet } from '../../context/SpreadsheetContext'
 import { getColumnIdToLetterMap } from '../../data/sheetsConfig'
+import { DOSSIER_STAGES, STAGE_COLOR_MAP } from '../../data/stagesConfig'
 import DossierListPage, { DossierBadge } from './DossierListPage'
-import { PIPELINE_NAME_KEY, PIPELINE_PHASES_KEY, DEFAULT_PHASES } from '../PipelineConfig'
+import { PIPELINE_NAME_KEY } from '../PipelineConfig'
 import { supabaseGet, supabasePost, supabaseUpsert } from '../../lib/supabase'
 import { sendVTRequestEmail } from '../../utils/sendVTEmail'
 import { useAuth } from '../../context/AuthContext'
@@ -16,74 +17,21 @@ import { formatDateFR } from '../../utils/dateUtils'
 import TransactionDetail from './TransactionDetail'
 import './Transactions.css'
 
-// ── Slot fallback labels ──────────────────────────────────────
-const SLOT_FALLBACK = {
-  installe:   'Centrale posée',
-  cno:        'CNO reçu',
-  dp_lancee:  'DP lancée',
-  dp_cours:   'DP en cours',
-  vt_validee: 'VT validée',
-  vt_cours:   'VT en cours',
-  signe:      'Signé',
-  lead:       'Lead entrant',
-}
-
-// ── Load slot map from localStorage ──────────────────────────
-function loadSlotMap() {
-  try {
-    const saved = localStorage.getItem(PIPELINE_PHASES_KEY)
-    const phases = saved ? JSON.parse(saved) : DEFAULT_PHASES
-    const map = {}
-    for (const p of phases) {
-      if (p.slot) map[p.slot] = { name: p.name, color: p.color }
-    }
-    return map
-  } catch { return {} }
-}
-
-function useSlotMap() {
-  const [map, setMap] = useState(loadSlotMap)
-  useEffect(() => {
-    let mounted = true
-    supabaseGet('pipeline_configs', { config_key: 'eq.main', select: 'phases' })
-      .then(data => {
-        if (!mounted) return
-        const phases = data?.[0]?.phases
-        if (!Array.isArray(phases) || phases.length === 0) return
-        localStorage.setItem(PIPELINE_PHASES_KEY, JSON.stringify(phases))
-        const newMap = {}
-        for (const p of phases) { if (p.slot) newMap[p.slot] = { name: p.name, color: p.color } }
-        setMap(newMap)
-      })
-    const sync = () => setMap(loadSlotMap())
-    window.addEventListener('storage', sync)
-    window.addEventListener('pipelineUpdated', sync)
-    return () => {
-      mounted = false
-      window.removeEventListener('storage', sync)
-      window.removeEventListener('pipelineUpdated', sync)
-    }
-  }, [])
-  return map
-}
-
-// ── Phase badge ───────────────────────────────────────────────
-function PhaseBadge({ slot, slotMap }) {
+// ── Phase badge (basé sur les étapes d'accordéon) ────────────
+function PhaseBadge({ slot }) {
   if (slot === '__cancelled') {
     return (
       <span style={{
         background: '#fee2e2', color: '#dc2626',
         display: 'inline-flex', alignItems: 'center',
-        gap: '5px', fontSize: '11.5px', fontWeight: 700,
+        fontSize: '11.5px', fontWeight: 700,
         padding: '3px 10px', borderRadius: '99px',
       }}>
         Annulé
       </span>
     )
   }
-  const entry = slotMap[slot] || {}
-  const name  = entry.name  || SLOT_FALLBACK[slot] || slot
-  const color = entry.color || '#64748b'
+  const color = STAGE_COLOR_MAP[slot] || '#64748b'
   return (
     <span style={{
       background: color + '22', color,
@@ -91,7 +39,7 @@ function PhaseBadge({ slot, slotMap }) {
       padding: '3px 10px', borderRadius: '99px',
       fontSize: '11.5px', fontWeight: 600, whiteSpace: 'nowrap',
     }}>
-      {name}
+      {slot || '—'}
     </span>
   )
 }
@@ -107,19 +55,9 @@ function extractRows(cells, commercialLetter) {
   return Array.from(rowSet).filter(r => cells[`${commercialLetter}${r}`])
 }
 
-function computePhaseKey(cells, colMap, row, sheetId) {
-  const get = id => { const l = colMap[id]; return l ? (cells[`${l}${row}`] || '') : '' }
-  let dpDone = false
-  try { const json = cells[`__dpForm:${row}`]; if (json) dpDone = JSON.parse(json).isComplete === true } catch { /* ignore */ }
-  const posed = sheetId === 'btob' ? get('DATE_POSE') : get('DATE_REELLE_POSE')
-  if (posed)                return 'installe'
-  if (get('RECEPTION_CNO')) return 'cno'
-  if (dpDone || get('N_DP')) return 'dp_lancee'
-  if (get('DEMANDE_DP'))    return 'dp_cours'
-  if (get('DATE_RETOUR_VT')) return 'vt_validee'
-  if (get('DATE_DDE_VT'))   return 'vt_cours'
-  if (get('SIGNE_LE'))      return 'signe'
-  return                           'lead'
+function getEtatDossier(cells, colMap, row) {
+  const letter = colMap['ETAT_DOSSIER']
+  return letter ? (cells[`${letter}${row}`] || 'Demande de VT') : 'Demande de VT'
 }
 
 function formatDate(raw) {
@@ -143,16 +81,20 @@ function useTransactions() {
     const colC = getColumnIdToLetterMap('btoc-comptant')
     const cellsC = sheets['btoc-comptant']?.cells || {}
     const parseCancelled = (cells, r) => { try { return JSON.parse(cells[`__cancelled:${r}`] || 'null') } catch { return null } }
+    const STAGE_ORDER = DOSSIER_STAGES.map(s => s.label)
+
     extractRows(cellsC, colC['COMMERCIAL']).forEach(r => {
       const nom = cellsC[`${colC['Colonne1']}${r}`] || ''
       if (!nom) return
       const cancelled = parseCancelled(cellsC, r)
       rows.push({
         id: `c:${r}`, nom,
-        phaseSlot:   cancelled ? '__cancelled' : computePhaseKey(cellsC, colC, r, 'btoc-comptant'),
+        phaseSlot:   cancelled ? '__cancelled' : getEtatDossier(cellsC, colC, r),
         commercial:  cellsC[`${colC['COMMERCIAL']}${r}`]  || '',
         dateCloture: cancelled ? cancelled.date : formatDate(cellsC[`${colC['SIGNE_LE']}${r}`] || ''),
-        montant:     cancelled ? '—' : formatMontant(cellsC[`${colC['TOTAL_TTC']}${r}`] || ''),
+        montant:          cancelled ? '—' : formatMontant(cellsC[`${colC['TOTAL_TTC']}${r}`] || ''),
+        chargesAffaires:  cellsC[`${colC['CHARGES_AFFAIRES']}${r}`] || '',
+        dateDdeVT:        formatDate(cellsC[`${colC['DATE_DDE_VT']}${r}`] || ''),
         type: 'Comptant', typeKey: 'comptant', cancelled,
       })
     })
@@ -164,10 +106,12 @@ function useTransactions() {
       const cancelled = parseCancelled(cellsA, r)
       rows.push({
         id: `a:${r}`, nom,
-        phaseSlot:   cancelled ? '__cancelled' : computePhaseKey(cellsA, colA, r, 'btoc-abonnement'),
+        phaseSlot:   cancelled ? '__cancelled' : getEtatDossier(cellsA, colA, r),
         commercial:  cellsA[`${colA['COMMERCIAL']}${r}`]  || '',
         dateCloture: cancelled ? cancelled.date : formatDate(cellsA[`${colA['SIGNE_LE']}${r}`] || ''),
-        montant:     cancelled ? '—' : formatMontant(cellsA[`${colA['MONTANT_TTC_VENTE']}${r}`] || ''),
+        montant:         cancelled ? '—' : formatMontant(cellsA[`${colA['MONTANT_TTC_VENTE']}${r}`] || ''),
+        chargesAffaires: cellsA[`${colA['CHARGES_AFFAIRES']}${r}`] || '',
+        dateDdeVT:       formatDate(cellsA[`${colA['DATE_DDE_VT']}${r}`] || ''),
         type: 'Abonnement', typeKey: 'abonnement', cancelled,
       })
     })
@@ -179,27 +123,29 @@ function useTransactions() {
       const cancelled = parseCancelled(cellsB, r)
       rows.push({
         id: `b:${r}`, nom,
-        phaseSlot:   cancelled ? '__cancelled' : computePhaseKey(cellsB, colB, r, 'btob'),
+        phaseSlot:   cancelled ? '__cancelled' : getEtatDossier(cellsB, colB, r),
         commercial:  cellsB[`${colB['COMMERCIAL']}${r}`]  || '',
         dateCloture: cancelled ? cancelled.date : formatDate(cellsB[`${colB['SIGNE_LE']}${r}`] || ''),
-        montant:     cancelled ? '—' : formatMontant(cellsB[`${colB['TOTAL_TTC']}${r}`] || ''),
+        montant:         cancelled ? '—' : formatMontant(cellsB[`${colB['TOTAL_TTC']}${r}`] || ''),
+        chargesAffaires: cellsB[`${colB['CHARGES_AFFAIRES']}${r}`] || '',
+        dateDdeVT:       formatDate(cellsB[`${colB['DATE_DDE_VT']}${r}`] || ''),
         type: 'BtoB', typeKey: 'btob', cancelled,
       })
     })
-    const ORDER = ['installe','cno','dp_lancee','dp_cours','vt_validee','vt_cours','signe','lead']
-    return rows.sort((a, b) => ORDER.indexOf(a.phaseSlot) - ORDER.indexOf(b.phaseSlot))
+    return rows.sort((a, b) => STAGE_ORDER.indexOf(a.phaseSlot) - STAGE_ORDER.indexOf(b.phaseSlot))
   }, [sheets])
 }
 
 // ── Columns ───────────────────────────────────────────────────
-function makeColumns(slotMap) {
+function makeColumns() {
   return [
-    { key: 'nom',         label: 'Nom de la transaction', width: 240, render: v => <span className="dossier-td--name">{v}</span> },
-    { key: 'type',        label: 'Type',                  width: 140, render: (v, row) => <DossierBadge label={v} colorKey={row.typeKey} /> },
-    { key: 'phaseSlot',   label: 'Phase',                 width: 200, render: (v, row) => <PhaseBadge slot={v} slotMap={slotMap} /> },
-    { key: 'dateCloture', label: 'Date de fermeture',     width: 160, hideOnMobile: true },
-    { key: 'commercial',  label: 'Propriétaire',           width: 160, hideOnMobile: true },
-    { key: 'montant',     label: 'Montant',                width: 130, hideOnMobile: true, render: (v, row) => row.cancelled ? <span style={{ color: '#dc2626', fontWeight: 600 }}>Annulé</span> : v },
+    { key: 'nom',             label: 'Nom de la transaction', width: 240, render: v => <span className="dossier-td--name">{v}</span> },
+    { key: 'dateDdeVT',       label: 'Date demande VT',       width: 140, hideOnMobile: true },
+    { key: 'dateCloture',     label: 'Date de fermeture',     width: 150, hideOnMobile: true },
+    { key: 'commercial',      label: 'Commercial',            width: 150, hideOnMobile: true },
+    { key: 'chargesAffaires', label: "Chargé d'affaires",    width: 160, hideOnMobile: true },
+    { key: 'phaseSlot',       label: 'Étape',                 width: 180, render: v => <PhaseBadge slot={v} /> },
+    { key: 'type',            label: 'Type',                  width: 130, render: (v, row) => <DossierBadge label={v} colorKey={row.typeKey} /> },
   ]
 }
 
@@ -284,7 +230,8 @@ export function AddTransactionPanel({ onClose, onCreated, lockedContact = null }
   const [formData, setFormData] = useState({
     commercial: '', typeContrat: 'comptant',
     puissance: '', reventeSurplus: '', contratMaintenance: '',
-    batterie: '', priseSécurisée: '',
+    batterie: '',
+    ond3kva: 0, ond5kva: 0, ond6kva: 0, ond8kva: 0, ond9kva: 0,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState(null)
@@ -339,7 +286,11 @@ export function AddTransactionPanel({ onClose, onCreated, lockedContact = null }
         reventeSurplus: formData.reventeSurplus,
         contratMaintenance: formData.contratMaintenance,
         batterie: formData.batterie,
-        priseSécurisée: formData.priseSécurisée,
+        ond3kva: formData.ond3kva || 0,
+        ond5kva: formData.ond5kva || 0,
+        ond6kva: formData.ond6kva || 0,
+        ond8kva: formData.ond8kva || 0,
+        ond9kva: formData.ond9kva || 0,
       }
 
       addVTRequest(targetSheet, {
@@ -522,6 +473,18 @@ export function AddTransactionPanel({ onClose, onCreated, lockedContact = null }
                 />
               </div>
 
+              <div className="form-group">
+                <label>Onduleurs</label>
+                <div className="form-onduleurs">
+                  {[['ond3kva','3 kVa'],['ond5kva','5 kVa'],['ond6kva','6 kVa'],['ond8kva','8 kVa'],['ond9kva','9 kVa']].map(([name, label]) => (
+                    <div key={name} className="form-ond-item">
+                      <span className="form-ond-label">{label}</span>
+                      <input type="number" min="0" name={name} value={formData[name]} onChange={handleChange} className="form-ond-input" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="form-row">
                 <div className="form-group">
                   <label>AC avec revente du surplus</label>
@@ -544,11 +507,11 @@ export function AddTransactionPanel({ onClose, onCreated, lockedContact = null }
               <div className="form-row">
                 <div className="form-group">
                   <label>Batterie</label>
-                  <input type="text" name="batterie" value={formData.batterie} onChange={handleChange} placeholder="Batterie" />
-                </div>
-                <div className="form-group">
-                  <label>Prise sécurisée</label>
-                  <input type="text" name="priseSécurisée" value={formData.priseSécurisée} onChange={handleChange} placeholder="Prise sécurisée" />
+                  <select name="batterie" value={formData.batterie} onChange={handleChange}>
+                    <option value="">-</option>
+                    <option value="oui">Oui</option>
+                    <option value="non">Non</option>
+                  </select>
                 </div>
               </div>
 
@@ -569,21 +532,16 @@ export function AddTransactionPanel({ onClose, onCreated, lockedContact = null }
 }
 
 // ── Kanban board ──────────────────────────────────────────────
-const KANBAN_ORDER = ['lead', 'signe', 'vt_cours', 'vt_validee', 'dp_cours', 'dp_lancee', 'cno', 'installe']
-
-function KanbanView({ rows, slotMap, onRowClick }) {
+function KanbanView({ rows, onRowClick }) {
   const cancelledCards = rows.filter(r => r.phaseSlot === '__cancelled')
   const columns = [
-    ...KANBAN_ORDER.map(slot => {
-      const entry = slotMap[slot] || {}
-      const name  = entry.name  || SLOT_FALLBACK[slot] || slot
-      const color = entry.color || '#94a3b8'
-      const cards = rows.filter(r => r.phaseSlot === slot)
+    ...DOSSIER_STAGES.map(stage => {
+      const cards = rows.filter(r => r.phaseSlot === stage.label)
       const total = cards.reduce((sum, r) => {
         const n = parseFloat(String(r.montant || '').replace(/[^\d.-]/g, ''))
         return sum + (isNaN(n) ? 0 : n)
       }, 0)
-      return { slot, name, color, cards, total }
+      return { slot: stage.key, name: stage.label, color: stage.color, cards, total }
     }),
     ...(cancelledCards.length > 0 ? [{ slot: '__cancelled', name: 'Annulé', color: '#ef4444', cards: cancelledCards, total: 0 }] : []),
   ]
@@ -742,11 +700,10 @@ function SettingsPanel({ pipelineName, onPipelineNameChange, onExport, onSave, o
 }
 
 // ── PDF export ────────────────────────────────────────────────
-function exportToPDF(rows, slotMap, pipelineName) {
-  const headers = ['Nom', 'Phase', 'Date de fermeture', 'Propriétaire', 'Montant']
+function exportToPDF(rows, pipelineName) {
+  const headers = ['Nom', 'Étape', 'Date de fermeture', 'Propriétaire', 'Montant']
   const tableRows = rows.map(row => {
-    const phaseName = slotMap[row.phaseSlot]?.name || SLOT_FALLBACK[row.phaseSlot] || row.phaseSlot
-    return `<tr><td>${row.nom||''}</td><td>${phaseName}</td><td>${row.dateCloture||''}</td><td>${row.commercial||''}</td><td>${row.montant||''}</td></tr>`
+    return `<tr><td>${row.nom||''}</td><td>${row.phaseSlot||''}</td><td>${row.dateCloture||''}</td><td>${row.commercial||''}</td><td>${row.montant||''}</td></tr>`
   }).join('')
   const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>${pipelineName}</title>
     <style>body{font-family:Arial,sans-serif;font-size:12px;margin:24px}h1{font-size:18px}
@@ -763,8 +720,7 @@ function exportToPDF(rows, slotMap, pipelineName) {
 // ── Main ──────────────────────────────────────────────────────
 export default function Transactions() {
   const rows    = useTransactions()
-  const slotMap = useSlotMap()
-  const COLUMNS = useMemo(() => makeColumns(slotMap), [slotMap])
+  const COLUMNS = useMemo(() => makeColumns(), [])
 
   const [showSettings,        setShowSettings]        = useState(false)
   const [showAdd,             setShowAdd]             = useState(false)
@@ -801,11 +757,10 @@ export default function Transactions() {
     if (!searchQuery.trim()) return rows
     const q = searchQuery.toLowerCase()
     return rows.filter(r => {
-      const phaseName = slotMap[r.phaseSlot]?.name || SLOT_FALLBACK[r.phaseSlot] || ''
-      return [r.nom, phaseName, r.commercial, r.dateCloture, r.montant]
+      return [r.nom, r.phaseSlot, r.commercial, r.dateCloture, r.montant]
         .some(v => String(v || '').toLowerCase().includes(q))
     })
-  }, [rows, searchQuery, slotMap])
+  }, [rows, searchQuery])
 
   const handleSave = () => {
     localStorage.setItem(PIPELINE_NAME_KEY, pipelineName)
@@ -851,7 +806,7 @@ export default function Transactions() {
         emptyTitle="Aucune transaction"
         emptyDesc="Les transactions issues de toutes les feuilles apparaîtront ici."
         contentOverride={view === 'kanban'
-          ? <KanbanView rows={filteredRows} slotMap={slotMap} onRowClick={row => setActiveTransactionId(row.id)} />
+          ? <KanbanView rows={filteredRows} onRowClick={row => setActiveTransactionId(row.id)} />
           : undefined
         }
         rightTabsContent={
@@ -877,7 +832,7 @@ export default function Transactions() {
         <SettingsPanel
           pipelineName={pipelineName}
           onPipelineNameChange={handlePipelineNameChange}
-          onExport={() => exportToPDF(filteredRows, slotMap, pipelineName)}
+          onExport={() => exportToPDF(filteredRows, pipelineName)}
           onSave={handleSave}
           onReset={handleReset}
           onClose={() => setShowSettings(false)}

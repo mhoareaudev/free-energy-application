@@ -138,6 +138,7 @@ export default function Mailing() {
             { trigger: 'J+2 sans CA assigné',         label: 'Rappel — CA manquant',        dest: 'Tous les techniciens',      status: 'active',  delay: 'J+2 · 8h00' },
             { trigger: 'J+1 après date VT sans retour', label: 'Rappel — Retour VT manquant', dest: 'Chargé d\'affaires',      status: 'active',  delay: 'J+1 · 8h00' },
             { trigger: 'Validation accordéon VT',     label: 'VT validée — Lancer la DP',  dest: 'Équipe administrative',     status: 'active',  delay: 'Immédiat' },
+            { trigger: 'J+5 après retour VT',         label: 'Rappel — Nomenclature à valider', dest: 'Chargé d\'affaires',      status: 'active',  delay: 'J+5 · 8h00' },
             { trigger: 'À venir',                     label: 'Rappel — CNO non reçu',       dest: '—',                        status: 'planned', delay: '—' },
             { trigger: 'À venir',                     label: 'Rappel — DP non lancée',      dest: '—',                        status: 'planned', delay: '—' },
           ].map((item, i) => (

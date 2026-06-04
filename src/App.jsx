@@ -15,6 +15,8 @@ import NomenclatureStock from './components/NomenclatureStock'
 import Tickets from './pages/Tickets'
 import Dashboard from './pages/Dashboard'
 import Mailing from './pages/Mailing'
+import AssistantAdmin from './pages/AssistantAdmin'
+import AssistantChat from './components/AssistantChat'
 import Contacts from './pages/dossiers/Contacts'
 import Entreprises from './pages/dossiers/Entreprises'
 import Transactions from './pages/dossiers/Transactions'
@@ -26,7 +28,11 @@ function AppContent() {
   const { user, loading } = useAuth()
   const location = useLocation()
   const [showVTModal, setShowVTModal] = useState(false)
-  const [showAdminPanel, setShowAdminPanel] = useState(false)
+  const [showAdminPanel,    setShowAdminPanel]    = useState(false)
+  const [showAssistant,     setShowAssistant]     = useState(false)
+  const [assistantMessages, setAssistantMessages] = useState([
+    { role: 'assistant', text: 'Bonjour ! Je suis l\'assistant Free Energy. Posez-moi une question sur l\'application 😊' }
+  ])
   const [activePage, setActivePage] = useState(
     () => location.state?.activePage || 'dashboard'
   )
@@ -50,10 +56,19 @@ function AppContent() {
             activePage={activePage}
             setActivePage={setActivePage}
             onOpenAdmin={() => setShowAdminPanel(true)}
+            onOpenAssistant={() => setShowAssistant(p => !p)}
           />
 
+          {showAssistant && (
+            <AssistantChat
+              onClose={() => setShowAssistant(false)}
+              messages={assistantMessages}
+              setMessages={setAssistantMessages}
+            />
+          )}
+
           <div className="app-main">
-            <TopBar />
+            <TopBar onOpenAssistant={() => setShowAssistant(p => !p)} />
 
             <div className="app-content">
               {activePage === 'dashboard' && <Dashboard />}
@@ -73,7 +88,8 @@ function AppContent() {
 
               {activePage === 'nomenclatures' && <NomenclatureStock />}
               {activePage === 'tickets'       && <Tickets />}
-              {activePage === 'mailing'       && <Mailing />}
+              {activePage === 'mailing'         && <Mailing />}
+              {activePage === 'assistant-admin' && <AssistantAdmin />}
             </div>
           </div>
         </div>
