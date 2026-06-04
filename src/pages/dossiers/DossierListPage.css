@@ -489,6 +489,12 @@
 
   .dossier-filter-bar { padding: 8px 16px; gap: 6px; }
 
+  /* Masquer les filtres et boutons inutiles sur mobile */
+  .dossier-filter-chip,
+  .dossier-filter-plus,
+  .dossier-filter-sep,
+  .dossier-filter-advanced { display: none; }
+
   /* Hide extra columns on mobile */
   .dossier-th--mob-hide,
   .dossier-td--mob-hide { display: none; }
