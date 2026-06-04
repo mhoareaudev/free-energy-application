@@ -472,7 +472,20 @@
 
   .dossier-title-btn h1 { font-size: 17px; }
 
+  /* Masquer le bouton + et les options sur mobile */
+  .dossier-header-right { display: none; }
+
   .dossier-tabs-bar { padding: 0 16px; overflow-x: auto; }
+
+  /* Masquer "Mes transactions" et le + des onglets sur mobile */
+  .dossier-tabs-bar .dossier-tab:not(:first-child):not(.dossier-tab-plus) { display: none; }
+  .dossier-tab-plus { display: none; }
+
+  /* Masquer triage et paramètres dans les contrôles pipeline sur mobile */
+  .tx-pipeline-controls .pipeline-selector { display: none; }
+  .tx-pipeline-controls .tx-ctrl-sep:first-of-type { display: none; }
+  .tx-pipeline-controls .tx-ctrl-btn[title="Trier"] { display: none; }
+  .tx-pipeline-controls .tx-ctrl-btn[title="Paramètres"] { display: none; }
 
   .dossier-filter-bar { padding: 8px 16px; gap: 6px; }
 
@@ -487,6 +500,4 @@
   /* Compact table cells */
   .dossier-th { padding: 8px 12px; font-size: 11px; }
   .dossier-td { padding: 10px 12px; font-size: 12.5px; }
-
-  .dossier-add-btn { font-size: 12px; padding: 0 12px; }
 }
