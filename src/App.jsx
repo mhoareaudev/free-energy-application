@@ -16,6 +16,7 @@ import Tickets from './pages/Tickets'
 import Dashboard from './pages/Dashboard'
 import Mailing from './pages/Mailing'
 import AssistantAdmin from './pages/AssistantAdmin'
+import ProfilPreferences from './pages/ProfilPreferences'
 import Calendrier from './pages/Calendrier'
 import AssistantChat from './components/AssistantChat'
 import Contacts from './pages/dossiers/Contacts'
@@ -69,7 +70,7 @@ function AppContent() {
           )}
 
           <div className="app-main">
-            <TopBar onOpenAssistant={() => setShowAssistant(p => !p)} />
+            <TopBar onOpenAssistant={() => setShowAssistant(p => !p)} onNavigate={setActivePage} />
 
             <div className="app-content">
               {activePage === 'dashboard' && <Dashboard onNavigate={setActivePage} />}
@@ -91,7 +92,8 @@ function AppContent() {
               {activePage === 'tickets'       && <Tickets />}
               {activePage === 'calendrier'       && <Calendrier />}
               {activePage === 'mailing'         && <Mailing />}
-              {activePage === 'assistant-admin' && <AssistantAdmin />}
+              {activePage === 'assistant-admin'   && <AssistantAdmin />}
+              {activePage === 'profil'            && <ProfilPreferences />}
             </div>
           </div>
         </div>

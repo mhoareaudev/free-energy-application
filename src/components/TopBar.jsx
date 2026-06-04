@@ -4,13 +4,136 @@ import { formatDateFR } from '../utils/dateUtils'
 import {
   Search, Phone, MessageSquare, HelpCircle, Settings,
   Bell, CheckCheck, X, Trash2, ClipboardList, BellOff,
-  Sparkles, ChevronDown, User,
+  Sparkles, ChevronDown, User, Lock, Eye, EyeOff, CheckCircle2,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNotifications } from '../context/NotificationContext'
+import { supabase } from '../lib/supabase'
 import './TopBar.css'
 
-export default function TopBar({ onOpenAssistant }) {
+function ProfileModal({ user, userProfile, onClose }) {
+  const [tab, setTab]           = useState('profil')
+  const [oldPwd, setOldPwd]     = useState('')
+  const [newPwd, setNewPwd]     = useState('')
+  const [confirmPwd, setConfirmPwd] = useState('')
+  const [showOld, setShowOld]   = useState(false)
+  const [showNew, setShowNew]   = useState(false)
+  const [loading, setLoading]   = useState(false)
+  const [success, setSuccess]   = useState(null)
+  const [error, setError]       = useState(null)
+
+  const fullName = [userProfile?.prenom, userProfile?.nom].filter(Boolean).join(' ')
+
+  const handlePasswordChange = async () => {
+    setError(null); setSuccess(null)
+    if (!newPwd) return setError('Le nouveau mot de passe est requis.')
+    if (newPwd.length < 6) return setError('Le mot de passe doit faire au moins 6 caractères.')
+    if (newPwd !== confirmPwd) return setError('Les mots de passe ne correspondent pas.')
+    setLoading(true)
+    const { error: err } = await supabase.auth.updateUser({ password: newPwd })
+    if (err) setError(err.message)
+    else { setSuccess('Mot de passe modifié avec succès !'); setOldPwd(''); setNewPwd(''); setConfirmPwd('') }
+    setLoading(false)
+  }
+
+  return (
+    <div className="profile-modal-backdrop" onClick={onClose}>
+      <div className="profile-modal" onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="profile-modal-header">
+          <div className="profile-modal-avatar">
+            {fullName ? fullName.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() : <User size={20} />}
+          </div>
+          <div>
+            <div className="profile-modal-name">{fullName || 'Utilisateur'}</div>
+            <div className="profile-modal-email">{user?.email}</div>
+            <div className="profile-modal-role">{userProfile?.role}</div>
+          </div>
+          <button className="profile-modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        {/* Tabs */}
+        <div className="profile-modal-tabs">
+          <button className={`profile-tab${tab === 'profil' ? ' profile-tab--active' : ''}`} onClick={() => setTab('profil')}>
+            <User size={13} /> Profil
+          </button>
+          <button className={`profile-tab${tab === 'securite' ? ' profile-tab--active' : ''}`} onClick={() => setTab('securite')}>
+            <Lock size={13} /> Sécurité
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="profile-modal-body">
+          {tab === 'profil' && (
+            <div className="profile-info-list">
+              <div className="profile-info-row">
+                <span className="profile-info-label">Nom complet</span>
+                <span className="profile-info-val">{fullName || '—'}</span>
+              </div>
+              <div className="profile-info-row">
+                <span className="profile-info-label">Email</span>
+                <span className="profile-info-val">{user?.email || '—'}</span>
+              </div>
+              <div className="profile-info-row">
+                <span className="profile-info-label">Rôle</span>
+                <span className="profile-info-val">{userProfile?.role || '—'}</span>
+              </div>
+              <div className="profile-info-row">
+                <span className="profile-info-label">Identifiant</span>
+                <span className="profile-info-val">{userProfile?.identifiant || '—'}</span>
+              </div>
+            </div>
+          )}
+
+          {tab === 'securite' && (
+            <div className="profile-pwd-form">
+              <p className="profile-pwd-hint">Choisissez un mot de passe d'au moins 6 caractères.</p>
+
+              <label>Nouveau mot de passe</label>
+              <div className="profile-pwd-wrap">
+                <input
+                  type={showNew ? 'text' : 'password'}
+                  className="profile-pwd-input"
+                  placeholder="Nouveau mot de passe"
+                  value={newPwd}
+                  onChange={e => setNewPwd(e.target.value)}
+                />
+                <button type="button" className="profile-pwd-eye" onClick={() => setShowNew(p => !p)}>
+                  {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+
+              <label>Confirmer le mot de passe</label>
+              <div className="profile-pwd-wrap">
+                <input
+                  type={showOld ? 'text' : 'password'}
+                  className="profile-pwd-input"
+                  placeholder="Confirmer le mot de passe"
+                  value={confirmPwd}
+                  onChange={e => setConfirmPwd(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handlePasswordChange()}
+                />
+                <button type="button" className="profile-pwd-eye" onClick={() => setShowOld(p => !p)}>
+                  {showOld ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+
+              {error   && <div className="profile-pwd-error">{error}</div>}
+              {success && <div className="profile-pwd-success"><CheckCircle2 size={14} />{success}</div>}
+
+              <button className="profile-pwd-save" onClick={handlePasswordChange} disabled={loading || !newPwd || !confirmPwd}>
+                {loading ? 'Modification…' : 'Modifier le mot de passe'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function TopBar({ onOpenAssistant, onNavigate }) {
   const navigate = useNavigate()
   const { userProfile, user, signOut } = useAuth()
   const {
@@ -183,7 +306,7 @@ export default function TopBar({ onOpenAssistant }) {
                 <div className="tum-info">
                   <div className="tum-name">{fullName || 'Utilisateur'}</div>
                   <div className="tum-email">{user?.email || userProfile?.role || ''}</div>
-                  <button className="tum-profil-link">Profil et préférences</button>
+                  <button className="tum-profil-link" onClick={() => { onNavigate?.('profil'); setShowUserMenu(false) }}>Profil et préférences</button>
                 </div>
               </div>
 
@@ -207,6 +330,7 @@ export default function TopBar({ onOpenAssistant }) {
         </div>
 
       </div>
+
     </header>
   )
 }
