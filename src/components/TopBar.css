@@ -465,8 +465,48 @@
 .topbar-notif-list::-webkit-scrollbar-track { background: transparent; }
 .topbar-notif-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
 
+/* ── Logo mobile ── */
+.topbar-logo-mob {
+  display: none;
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 /* ── Mobile ── */
 @media (max-width: 768px) {
+  .topbar {
+    justify-content: space-between;
+    padding: 0 14px;
+  }
+
+  /* Logo visible uniquement sur mobile */
+  .topbar-logo-mob { display: block; }
+
+  /* Recherche masquée */
   .topbar-search { display: none; }
+
+  /* Icônes desktop masquées */
   .topbar-icon-btn--mob-hide { display: none; }
+
+  /* Séparateurs masqués */
+  .topbar-sep { display: none; }
+
+  /* Icône group masqué */
+  .topbar-icon-group { display: none; }
+
+  /* Assistant et user collés à droite */
+  .topbar-right {
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .topbar-assistant-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .topbar-user-company { display: none; }
+  .topbar-user-btn { padding: 4px 8px; gap: 4px; }
 }

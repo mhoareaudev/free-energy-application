@@ -63,6 +63,9 @@ export default function TopBar({ onOpenAssistant }) {
   return (
     <header className="topbar">
 
+      {/* ── Logo mobile uniquement ── */}
+      <img src="/logo.png" alt="FE" className="topbar-logo-mob" />
+
       {/* ── Search ── */}
       <div className="topbar-search">
         <Search size={14} className="topbar-search-icon" />
