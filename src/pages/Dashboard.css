@@ -357,7 +357,20 @@
 
   .dash-hbar-name { font-size: 11px; }
 
+  /* Email grid en 2 colonnes sur mobile */
   .dash-email-grid { grid-template-columns: repeat(2, 1fr); }
+  .dash-email-grid--4 { grid-template-columns: repeat(2, 1fr); }
+
+  /* Mini liste des poses : texte plus compact */
+  .dash-mini-name { font-size: 12px; }
+  .dash-mini-meta { font-size: 11px; }
+
+  /* Refresh button plus compact */
+  .dash-refresh-btn { padding: 5px 10px; font-size: 11px; }
+
+  /* Stats list (suivi technique / finance) */
+  .dash-stat-label { font-size: 12px; }
+  .dash-stat-val   { font-size: 13px; }
 }
 
 /* ── Email stats section ── */
