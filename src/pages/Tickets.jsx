@@ -1181,7 +1181,7 @@ export default function Tickets() {
   }
 
   return (
-    <div className="dossier-page">
+    <div className="dossier-page tk-tickets-page">
 
       {syncToast && (
         <div className="tk-sync-toast">

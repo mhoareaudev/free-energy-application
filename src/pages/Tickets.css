@@ -727,9 +727,9 @@
   background: #fef2f2; display: flex; align-items: center; justify-content: center;
 }
 
-/* ── Media queries ── */
+/* ── Media queries (tickets page only) ── */
 @media (max-width: 768px) {
-  .dossier-table-wrap { display: none; }
+  .tk-tickets-page .dossier-table-wrap { display: none; }
   .tk-mobile-cards { display: block; }
   .tk-drawer { width: 100%; }
 }
