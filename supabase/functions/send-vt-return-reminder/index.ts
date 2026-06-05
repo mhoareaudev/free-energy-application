@@ -102,10 +102,12 @@ serve(async (req: Request) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
-  // Dossiers dont la date prévisionnelle VT était hier (J-1) et sans date retour VT
-  const yesterday = new Date()
-  yesterday.setDate(yesterday.getDate() - 1)
-  const yDate = yesterday.toISOString().split('T')[0]
+  // Hier en heure La Réunion (UTC+4)
+  const reunionOffset = 4 * 60 * 60 * 1000
+  const reunionNow = new Date(Date.now() + reunionOffset)
+  const d1 = new Date(reunionNow)
+  d1.setDate(d1.getDate() - 1)
+  const yDate = d1.toISOString().split('T')[0] // YYYY-MM-DD
 
   const { data: requests, error } = await supabase
     .from('vt_requests')
@@ -121,7 +123,21 @@ serve(async (req: Request) => {
 
   let sent = 0
   for (const req of requests) {
-    if (!req.ca_email) continue
+    // Résoudre l'email du CA : depuis vt_requests en priorité,
+    // sinon chercher dans profiles par nom complet
+    let caEmail = req.ca_email || null
+    if (!caEmail && req.charges_affaires) {
+      const { data: allProfiles } = await supabase
+        .from('profiles')
+        .select('identifiant, prenom, nom')
+        .eq('role', 'technique')
+      const match = (allProfiles || []).find((p: any) => {
+        const fullName = [p.prenom, p.nom].filter(Boolean).join(' ')
+        return fullName === req.charges_affaires
+      })
+      caEmail = match?.identifiant || null
+    }
+    if (!caEmail) continue
 
     const clientName = [req.prenom, req.nom].filter(Boolean).join(' ') || 'Client inconnu'
     const caName     = req.charges_affaires || 'Chargé d\'affaires'
@@ -131,7 +147,7 @@ serve(async (req: Request) => {
     const resendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: FROM_EMAIL, to: [req.ca_email], subject, html }),
+      body: JSON.stringify({ from: FROM_EMAIL, to: [caEmail], subject, html }),
     })
 
     if (resendRes.ok) {

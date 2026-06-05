@@ -114,17 +114,21 @@ serve(async (req: Request) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
-  // Dossiers créés entre 48h et 72h ago (fenêtre J+2)
+  // Dossiers créés le jour J-2 (heure La Réunion = UTC+4)
+  // Comparaison par jour entier pour éviter les décalages horaires
   const now = new Date()
-  const from = new Date(now.getTime() - 72 * 60 * 60 * 1000).toISOString()
-  const to   = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString()
+  const reunionOffset = 4 * 60 * 60 * 1000
+  const reunionNow = new Date(now.getTime() + reunionOffset)
+  const d2 = new Date(reunionNow)
+  d2.setDate(d2.getDate() - 2)
+  const dateJ2 = d2.toISOString().split('T')[0] // YYYY-MM-DD
 
   const { data: requests, error } = await supabase
     .from('vt_requests')
     .select('*')
-    .gte('created_at', from)
-    .lte('created_at', to)
-    .is('charges_affaires', null)  // pas encore assigné
+    .gte('created_at', dateJ2 + 'T00:00:00+04:00')
+    .lte('created_at', dateJ2 + 'T23:59:59+04:00')
+    .is('charges_affaires', null)
     .neq('status', 'assigned')
 
   if (error || !requests?.length) {
