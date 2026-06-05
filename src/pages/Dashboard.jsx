@@ -111,6 +111,23 @@ function useDashboardData(loggedInName, role) {
       return { label: new Date(+y, +m-1, 1).toLocaleDateString('fr-FR', { month: 'short' }), count }
     })
 
+    // Daily — 30 derniers jours (label tous les 7 jours)
+    const daily30 = []
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)
+      const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      const label = (i % 7 === 0 || i === 0) ? `${d.getDate()}/${d.getMonth()+1}` : ''
+      daily30.push({ iso, label, count: 0 })
+    }
+    allRows.forEach(r => {
+      const dateStr = r.signeLe || r.dateDdeVT
+      const d = parseDateFR(dateStr); if (!d) return
+      const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      const entry = daily30.find(e => e.iso === iso)
+      if (entry) entry.count++
+    })
+    const daily = daily30.map(({ label, count }) => ({ label, count }))
+
     // Pipeline de suivi technique (progression post-signature)
     const pipeline = [
       { label: 'Dossiers ouverts', count: totalDossiers,                                          color: '#6366f1' },
@@ -143,7 +160,7 @@ function useDashboardData(loggedInName, role) {
 
     // ── Technique ──
     const today = new Date(); today.setHours(0,0,0,0)
-    const awaitingVTList = allRows.filter(r => r.signeLe && r.dateDdeVT && !r.dateRetourVT)
+    const awaitingVTList = allRows.filter(r => r.dateDdeVT && !r.dateRetourVT)
     const vtThisWeek     = awaitingVTList.filter(r => {
       const d = parseDateFR(r.datePrevVT); if (!d) return false
       const diff = (d - today) / 86400000; return diff >= 0 && diff <= 7
@@ -151,7 +168,7 @@ function useDashboardData(loggedInName, role) {
     const vtOverdueList  = awaitingVTList.filter(r => {
       const d = parseDateFR(r.dateDdeVT); return d && (today - d) / 86400000 > 21
     })
-    const dpPendingList  = allRows.filter(r => r.signeLe && r.dateDdeVT && r.dateRetourVT && !r.nDP)
+    const dpPendingList  = allRows.filter(r => r.dateDdeVT && r.dateRetourVT && !r.nDP)
     const posesToPlan    = allRows.filter(r => r.receptionCNO && !r.dateReellePose)
     const nextPoses      = allRows
       .filter(r => { const d = parseDateFR(r.datePrevPose); return d && d >= today })
@@ -187,10 +204,10 @@ function useDashboardData(loggedInName, role) {
       : null
 
     // ── Admin/Finance ──
-    const totalResteEncaisser  = allRows.reduce((s,r) => s + (r.signeLe ? r.resteEncaisser : 0), 0)
-    const dossiersAvecFin      = allRows.filter(r => r.signeLe && r.financement).length
-    const dossiersAttenteAdmin = allRows.filter(r => r.signeLe && !r.receptionBDC).length
-    const caEnCours            = allRows.filter(r => r.signeLe && !r.dateReellePose)
+    const totalResteEncaisser  = allRows.reduce((s,r) => s + r.resteEncaisser, 0)
+    const dossiersAvecFin      = allRows.filter(r => r.financement).length
+    const dossiersAttenteAdmin = allRows.filter(r => !r.receptionBDC).length
+    const caEnCours            = allRows.filter(r => !r.dateReellePose)
                                         .reduce((s,r) => s + (r.totalTTC || r.montantAbt), 0)
 
     // Mini table pour le tableau de bord technique (5 dossiers en cours)
@@ -211,6 +228,7 @@ function useDashboardData(loggedInName, role) {
       etatBreakdown, techniciens,
       avgDays,
       totalResteEncaisser, dossiersAvecFin, dossiersAttenteAdmin, caEnCours,
+      daily,
     }
   }, [sheets, loggedInName, role])
 }
@@ -433,9 +451,84 @@ export default function Dashboard({ onNavigate }) {
 
   const isCommercial   = role === ROLES.COMMERCIAL
   const isTechnique    = role === ROLES.TECHNIQUE
-  const isAdministratif = role === ROLES.ADMINISTRATIF
-  const useTechView    = isTechnique || isAdministratif
+  const isAdministratif = role === ROLES.ADMINISTRATIF || role === ROLES.ADMINISTRATEUR
+  const useTechView    = isTechnique
   const today = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
+
+  // ── Section: Administratif ───────────────────────────────────
+  const renderAdministratif = () => (
+    <>
+      {/* KPIs */}
+      <div className="dash-kpi-grid">
+        <KpiCard icon={FolderOpen}  label="Total contacts"      value={data.totalDossiers}
+          sub="Tous sheets confondus" color="#6366f1" />
+        <KpiCard icon={Zap}         label="Puissance réalisée"  value={data.totalKWc > 0 ? `${data.totalKWc.toFixed(1)} kWc` : '—'}
+          sub="Cumulée tous dossiers" color="#f97316" />
+        <KpiCard icon={TrendingUp}  label="Avancée globale"     value={`${data.tauxPoses} %`}
+          sub="Dossiers posés / total" color="#10b981" />
+        <KpiCard icon={Hammer}      label="Posés"               value={data.posesDone}
+          sub={`sur ${data.totalDossiers} dossier${data.totalDossiers !== 1 ? 's' : ''}`} color="#8b5cf6" />
+      </div>
+
+      {/* Performance commerciaux + État dossiers */}
+      <div className="dash-charts-row">
+        <div className="dash-card dash-card--wide">
+          <div className="dash-card-header">
+            <Users size={15} /><span>Performance commerciaux</span><span className="dash-card-sub">nombre de dossiers</span>
+          </div>
+          {data.commerciaux.length === 0
+            ? <div className="dash-empty">Aucune donnée</div>
+            : <BarChart data={data.commerciaux.map(c => ({ label: c.name.split(' ')[0], count: c.count }))} />}
+        </div>
+        <div className="dash-card">
+          <div className="dash-card-header"><ClipboardList size={15} /><span>État des dossiers</span></div>
+          {data.etatBreakdown.length === 0
+            ? <div className="dash-empty">Aucun dossier en cours</div>
+            : <EtatPills data={data.etatBreakdown} />}
+        </div>
+      </div>
+
+      {/* Dossiers par jour + (espace) */}
+      <div className="dash-charts-row">
+        <div className="dash-card dash-card--wide">
+          <div className="dash-card-header">
+            <Activity size={15} /><span>Dossiers ouverts par jour</span><span className="dash-card-sub">30 derniers jours</span>
+          </div>
+          {data.daily.every(d => d.count === 0)
+            ? <div className="dash-empty">Aucun dossier sur les 30 derniers jours</div>
+            : <LineChart data={data.daily} />}
+        </div>
+        <div className="dash-card">
+          <div className="dash-card-header"><Calendar size={15} /><span>Prochaines poses</span></div>
+          <MiniList
+            rows={data.nextPoses.map(r => ({ nom: r.nom, meta: r.datePrevPose, badge: r.chargesAffaires || undefined, badgeColor: '#6366f1' }))}
+            emptyText="Aucune pose planifiée"
+          />
+        </div>
+      </div>
+
+      {/* Suivi technique + Prochaines poses */}
+      <div className="dash-charts-row">
+        <div className="dash-card">
+          <div className="dash-card-header"><Wrench size={15} /><span>Suivi technique</span></div>
+          <div className="dash-stat-list">
+            <div className="dash-stat-row"><span className="dash-stat-label">En attente de VT</span><span className="dash-stat-val" style={data.vtOverdue > 0 ? { color:'#ef4444' } : {}}>{data.awaitingVT}</span></div>
+            <div className="dash-stat-row"><span className="dash-stat-label">VTs cette semaine</span><span className="dash-stat-val">{data.vtThisWeek}</span></div>
+            <div className="dash-stat-row"><span className="dash-stat-label">DP à lancer</span><span className="dash-stat-val">{data.dpPending}</span></div>
+            <div className="dash-stat-row"><span className="dash-stat-label">Poses à planifier</span><span className="dash-stat-val">{data.posesToPlan}</span></div>
+            <div className="dash-stat-row"><span className="dash-stat-label">VTs en retard (+21j)</span><span className="dash-stat-val" style={{ color:'#ef4444' }}>{data.vtOverdue}</span></div>
+          </div>
+        </div>
+        <div className="dash-card dash-card--wide">
+          <div className="dash-card-header"><Calendar size={15} /><span>Prochaines poses planifiées</span></div>
+          <MiniList
+            rows={data.nextPoses.map(r => ({ nom: r.nom, meta: r.datePrevPose, badge: r.chargesAffaires || undefined, badgeColor: '#6366f1' }))}
+            emptyText="Aucune pose planifiée"
+          />
+        </div>
+      </div>
+    </>
+  )
 
   // ── Section: Commercial ──────────────────────────────────────
   const renderCommercial = () => (
@@ -903,7 +996,7 @@ export default function Dashboard({ onNavigate }) {
           <p className="dash-date">{today.charAt(0).toUpperCase() + today.slice(1)}</p>
         </div>
       </div>
-      {renderOverview()}
+      {isAdministratif ? renderAdministratif() : renderOverview()}
     </div>
   )
 }
