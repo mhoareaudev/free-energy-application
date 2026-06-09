@@ -786,13 +786,7 @@ function NomenclatureAccordionContent({ cells, rowNum, sheetId, setCellValue, no
 
 // ── Accordion stage (always rendered, animated via CSS grid) ────
 function AccordionStage({ stage, isOpen, onToggle, done, cells, colMap, rowNum, sheetId, setCellValue, validated, onValidate, onUnvalidate, extraContent = null, canValidateExtra = true, cancelled = false }) {
-  const requiredFields = stage.fields.filter(f => f.required)
-  const canValidate = (requiredFields.length === 0 || requiredFields.every(f => {
-    const resolvedId = sheetId === 'btob' && f.btobId ? f.btobId : f.id
-    const letter = colMap[resolvedId]
-    if (!letter) return true
-    return !!(cells[`${letter}${rowNum}`] || '').trim()
-  })) && canValidateExtra
+  const canValidate = canValidateExtra
 
   return (
     <div className={`td-stage${isOpen ? ' td-stage--open' : ''}${validated ? ' td-stage--validated' : ''}${cancelled ? ' td-stage--cancelled' : ''}`}>
@@ -847,7 +841,6 @@ function AccordionStage({ stage, isOpen, onToggle, done, cells, colMap, rowNum, 
                   className="td-stage-validate-btn"
                   onClick={e => { e.stopPropagation(); onValidate() }}
                   disabled={!canValidate}
-                  title={!canValidate ? 'Remplissez tous les champs obligatoires pour valider' : undefined}
                 >
                   <CheckCircle2 size={12} />
                   Valider
