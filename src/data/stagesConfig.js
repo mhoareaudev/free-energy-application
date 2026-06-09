@@ -9,7 +9,8 @@ export const DOSSIER_STAGES = [
   { key: 'pose',         label: 'Pose',              color: '#f97316' },
   { key: 'consuel',      label: 'Consuel',           color: '#22c55e' },
   { key: 'edf',          label: 'EDF',               color: '#0ea5e9' },
-  { key: 'termine',      label: 'Terminé',           color: '#64748b' },
+  { key: 'termine',      label: 'Terminé',           color: '#16a34a' },
+  { key: 'annule',       label: 'Annulé',            color: '#ef4444' },
 ]
 
 // Map label → color pour un accès rapide

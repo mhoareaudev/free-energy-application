@@ -47,13 +47,13 @@ function useDashboardData(loggedInName, role) {
         if (m) { const r = parseInt(m[1]); if (r >= 2) rowSet.add(r) }
       })
       rowSet.forEach(r => {
-        if (cells[`__cancelled:${r}`]) return
         const get = id => { const l = colMap[id]; return l ? (cells[`${l}${r}`] || '') : '' }
         const nom = get(def.nameCol)
         const commercial = get('COMMERCIAL')
         if (!nom && !commercial) return
+        const cancelled = !!cells[`__cancelled:${r}`]
         allRows.push({
-          id: `${def.prefix}:${r}`, sheetId: def.id, type: def.type, nom, commercial,
+          id: `${def.prefix}:${r}`, sheetId: def.id, type: def.type, nom, commercial, cancelled,
           signeLe:              get('SIGNE_LE'),
           rdvPris:              get('RDV_PRIS_LE'),
           rdvPerdu:             get('RDV_PERDU'),
@@ -88,10 +88,11 @@ function useDashboardData(loggedInName, role) {
     // ── KPIs — toutes les lignes = clients signés ──
     // Chaque dossier dans l'app est déjà post-signature : l'app est l'outil de suivi après signature.
     const totalDossiers = rows.length
-    const totalCA       = rows.reduce((s, r) => s + (r.totalTTC || r.montantAbt), 0)
-    const totalKWc      = rows.reduce((s, r) => s + r.puissanceRealisee, 0)
-    const posesDone     = rows.filter(r => r.dateReellePose).length
-    const tauxPoses     = totalDossiers > 0 ? Math.round((posesDone / totalDossiers) * 100) : 0
+    const activeRows    = rows.filter(r => !r.cancelled)
+    const totalCA       = activeRows.reduce((s, r) => s + (r.totalTTC || r.montantAbt), 0)
+    const totalKWc      = activeRows.reduce((s, r) => s + r.puissanceRealisee, 0)
+    const posesDone     = activeRows.filter(r => r.dateReellePose).length
+    const tauxPoses     = activeRows.length > 0 ? Math.round((posesDone / activeRows.length) * 100) : 0
 
     // Monthly new dossiers — use SIGNE_LE as date d'ouverture, fallback to DATE_DDE_VT
     const now = new Date()
@@ -176,7 +177,7 @@ function useDashboardData(loggedInName, role) {
       .slice(0, 8)
 
     const etatMap = {}
-    allRows.filter(r => !r.dateReellePose).forEach(r => {
+    allRows.forEach(r => {
       const e = r.etatDossier || 'Demande de VT'; etatMap[e]=(etatMap[e]||0)+1
     })
     const etatBreakdown = Object.entries(etatMap).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([label,count])=>({label,count}))

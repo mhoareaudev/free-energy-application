@@ -775,7 +775,7 @@ export default function Transactions() {
     if (!searchQuery.trim()) return rows
     const q = searchQuery.toLowerCase()
     return rows.filter(r => {
-      return [r.nom, r.phaseSlot, r.commercial, r.dateCloture, r.montant]
+      return [r.nom, r.phaseSlot, r.commercial, r.dateCloture, r.montant, r.dateDdeVT]
         .some(v => String(v || '').toLowerCase().includes(q))
     })
   }, [rows, searchQuery])

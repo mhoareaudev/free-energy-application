@@ -108,7 +108,7 @@ const COLS = [
 ]
 
 export default function ImportPreviewModal({ onClose }) {
-  const { batchImportRows } = useSpreadsheet()
+  const { batchImportRows, sheets } = useSpreadsheet()
 
   const [raw,       setRaw]       = useState([])
   const [loading,   setLoading]   = useState(true)
@@ -127,6 +127,18 @@ export default function ImportPreviewModal({ onClose }) {
   }, [])
 
   const mapped = useMemo(() => raw.map(mapEntry), [raw])
+
+  // Build a set of already-imported names (column C = nom client in all sheets)
+  const importedNames = useMemo(() => {
+    const names = new Set()
+    Object.values(sheets).forEach(sheet => {
+      if (!sheet?.cells) return
+      Object.entries(sheet.cells).forEach(([key, val]) => {
+        if (/^C\d+$/.test(key) && val) names.add(val.trim().toLowerCase())
+      })
+    })
+    return names
+  }, [sheets])
 
   const counts = useMemo(() => ({
     all:        mapped.length,
@@ -316,21 +328,27 @@ export default function ImportPreviewModal({ onClose }) {
                 <tbody>
                   {rows.length === 0 ? (
                     <tr><td colSpan={COLS.length + 1} className="ipm-empty">Aucune entrée</td></tr>
-                  ) : rows.map(row => (
+                  ) : rows.map(row => {
+                    const isImported = importedNames.has(row.nom.trim().toLowerCase())
+                    return (
                     <tr
                       key={row.id}
-                      className={selected.has(row.id) ? 'ipm-tr--selected' : ''}
-                      onClick={() => toggleRow(row.id)}
+                      className={`${isImported ? 'ipm-tr--imported' : ''} ${selected.has(row.id) ? 'ipm-tr--selected' : ''}`}
+                      onClick={() => !isImported && toggleRow(row.id)}
                     >
                       <td className="ipm-td--check" onClick={e => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           className="ipm-checkbox"
                           checked={selected.has(row.id)}
+                          disabled={isImported}
                           onChange={() => toggleRow(row.id)}
                         />
                       </td>
-                      <td className="ipm-td--name">{row.nom}</td>
+                      <td className="ipm-td--name">
+                        {row.nom}
+                        {isImported && <span className="ipm-imported-badge">✓ importé</span>}
+                      </td>
                       <td className="ipm-td--muted">{row.email}</td>
                       <td className="ipm-td--muted">{row.tel}</td>
                       <td className="ipm-td--muted">{row.adresse}</td>
@@ -341,7 +359,7 @@ export default function ImportPreviewModal({ onClose }) {
                       <td>{row.etapeLabel}</td>
                       <td><SheetBadge sheetKey={row.sheetKey} /></td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>

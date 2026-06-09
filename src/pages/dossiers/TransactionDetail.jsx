@@ -1022,17 +1022,6 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
     setCellValue(sheetId, `__validated:${rowNum}`, JSON.stringify(next))
 
     if (stageKey === 'vt') {
-      const chargesAffaires = [userProfile?.prenom, userProfile?.nom].filter(Boolean).join(' ')
-      if (chargesAffaires) {
-        const caLetter = colMap['CHARGES_AFFAIRES']
-        const caCellKey = caLetter ? `${caLetter}${rowNum}` : null
-        if (caCellKey) setCellValue(sheetId, caCellKey, chargesAffaires)
-        if (vtFormData) {
-          const updated = { ...vtFormData, technicien_vt: chargesAffaires }
-          setCellValue(sheetId, `__vtFormData:${rowNum}`, JSON.stringify(updated))
-          setVtFormData(updated)
-        }
-      }
       // Email aux administratifs pour lancer la DP
       sendVTValidatedEmail()
     }

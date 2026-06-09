@@ -59,7 +59,10 @@ export default function DossierListPage({
     const col = columns[sortCol]
     const va = String(a[col.key] ?? '')
     const vb = String(b[col.key] ?? '')
-    const cmp = va.localeCompare(vb, 'fr', { sensitivity: 'base' })
+    // Parse DD/MM/YYYY into a sortable timestamp
+    const parseFR = s => { const p = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return p ? new Date(+p[3], +p[2]-1, +p[1]).getTime() : null }
+    const da = parseFR(va), db = parseFR(vb)
+    const cmp = (da !== null && db !== null) ? da - db : va.localeCompare(vb, 'fr', { sensitivity: 'base' })
     return sortDir === 'asc' ? cmp : -cmp
   })
 

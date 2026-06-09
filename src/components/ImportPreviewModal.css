@@ -221,6 +221,24 @@
 .ipm-tr--selected { background: #fff7ed !important; }
 .ipm-tr--selected:hover { background: #ffedd5 !important; }
 
+.ipm-tr--imported { background: #f0fdf4 !important; cursor: default; }
+.ipm-tr--imported:hover { background: #dcfce7 !important; }
+.ipm-tr--imported td { color: #15803d; }
+.ipm-tr--imported .ipm-td--muted { color: #86efac; }
+
+.ipm-imported-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #dcfce7;
+  color: #16a34a;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 .ipm-table td {
   padding: 9px 12px;
   color: #374151;
