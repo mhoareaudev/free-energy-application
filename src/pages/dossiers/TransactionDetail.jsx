@@ -1441,6 +1441,7 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
       supabaseDelete('contact_activities', { contact_id: `eq.${transactionId}` }),
       supabaseDelete('contact_task_lists',  { contact_id: `eq.${transactionId}` }),
       supabaseDelete('contact_metadata',    { contact_id: `eq.${transactionId}` }),
+      supabaseDelete('vt_requests',         { contact_id: `eq.${transactionId}` }),
     ])
     setDeleting(false)
     setDeleted(true)
@@ -1547,6 +1548,14 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
     } catch (e) {
       console.warn('CA assignment email failed:', e)
     }
+  }
+
+  // Met à jour un champ du formulaire VT (revente surplus / maintenance / onduleurs)
+  // sans passer par la modal "Fiche VT" — persisté dans __vtFormData comme le reste.
+  const updateVtFormField = (key, value) => {
+    const updated = { ...(vtFormData || { adresse, codePostal, commune: ville, email, tel, commercial, clientName: nom }), [key]: value }
+    setVtFormData(updated)
+    setCellValue(sheetId, `__vtFormData:${rowNum}`, JSON.stringify(updated))
   }
 
   const handleVtSave = async data => {
@@ -1758,6 +1767,51 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
                 <div className={`td-info-value${!value ? ' td-info-empty' : ''}`}>{value || '—'}</div>
               </div>
             ))}
+          </div>
+
+          <div className="td-info-section">
+            <div className="td-info-header">Détails du projet</div>
+            <div className="td-info-row">
+              <div className="td-info-label">AC avec revente du surplus</div>
+              <select
+                className="td-ca-select"
+                value={vtFormData?.reventeSurplus || ''}
+                onChange={e => updateVtFormField('reventeSurplus', e.target.value)}
+              >
+                <option value="">-</option>
+                <option value="oui">Oui</option>
+                <option value="non">Non</option>
+              </select>
+            </div>
+            <div className="td-info-row">
+              <div className="td-info-label">Contrat de maintenance</div>
+              <select
+                className="td-ca-select"
+                value={vtFormData?.contratMaintenance || ''}
+                onChange={e => updateVtFormField('contratMaintenance', e.target.value)}
+              >
+                <option value="">-</option>
+                <option value="oui">Oui</option>
+                <option value="non">Non</option>
+              </select>
+            </div>
+            <div className="td-info-row">
+              <div className="td-info-label">Onduleurs</div>
+              <div className="td-ond-row">
+                {[['ond3kva', '3 kVa'], ['ond5kva', '5 kVa'], ['ond6kva', '6 kVa'], ['ond8kva', '8 kVa'], ['ond9kva', '9 kVa']].map(([key, label]) => (
+                  <div key={key} className="td-ond-item">
+                    <span className="td-ond-item-label">{label}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      className="td-ond-input"
+                      value={vtFormData?.[key] ?? 0}
+                      onChange={e => updateVtFormField(key, parseInt(e.target.value, 10) || 0)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </aside>
 

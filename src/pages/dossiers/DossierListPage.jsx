@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDown, Plus, MoreHorizontal, LayoutList, ArrowUpDown } from 'lucide-react'
 import './DossierListPage.css'
 
@@ -34,14 +34,20 @@ export default function DossierListPage({
   emptyDesc,
   rightTabsContent,
   alwaysShowTable = false,
-  contentOverride,   // replaces table/empty-state entirely when set
+  contentOverride,
   onAdd,
   onRowClick,
+  onSelectionChange,
+  selectionVersion = 0,
+  bulkBar,
 }) {
   const [activeTab, setActiveTab]   = useState(0)
   const [sortCol, setSortCol]       = useState(null)
   const [sortDir, setSortDir]       = useState('asc')
   const [checked, setChecked]       = useState(new Set())
+
+  useEffect(() => { setChecked(new Set()) }, [selectionVersion])
+  useEffect(() => { onSelectionChange?.(checked) }, [checked])
 
   const handleSort = (idx) => {
     if (sortCol === idx) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -103,12 +109,16 @@ export default function DossierListPage({
 
       {/* ── Filter bar ── */}
       <div className="dossier-filter-bar">
-        <button className="dossier-filter-chip">Propriétaire <ChevronDown size={10} /></button>
-        <button className="dossier-filter-chip">Date de création <ChevronDown size={10} /></button>
-        <button className="dossier-filter-chip">Dernière activité <ChevronDown size={10} /></button>
-        <button className="dossier-filter-plus"><Plus size={13} /></button>
-        <div className="dossier-filter-sep" />
-        <button className="dossier-filter-advanced">Filtres avancés</button>
+        {checked.size > 0 && bulkBar ? bulkBar(checked.size, () => setChecked(new Set())) : (
+          <>
+            <button className="dossier-filter-chip">Propriétaire <ChevronDown size={10} /></button>
+            <button className="dossier-filter-chip">Date de création <ChevronDown size={10} /></button>
+            <button className="dossier-filter-chip">Dernière activité <ChevronDown size={10} /></button>
+            <button className="dossier-filter-plus"><Plus size={13} /></button>
+            <div className="dossier-filter-sep" />
+            <button className="dossier-filter-advanced">Filtres avancés</button>
+          </>
+        )}
       </div>
 
       {/* ── Content ── */}

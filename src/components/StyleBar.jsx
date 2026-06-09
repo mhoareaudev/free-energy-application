@@ -16,10 +16,12 @@ import {
   Clipboard,
   Upload,
   ArrowDownNarrowWide,
+  Download,
 } from 'lucide-react'
 import { useSpreadsheet } from '../context/SpreadsheetContext'
 import { FONT_FAMILIES, FONT_SIZES, COLOR_PRESETS } from '../data/sheetsConfig'
 import ImportModal from './ImportModal'
+import DownloadModal from './DownloadModal'
 import './StyleBar.css'
 
 export default function StyleBar() {
@@ -42,8 +44,9 @@ export default function StyleBar() {
   const [showSizeDropdown, setShowSizeDropdown] = useState(false)
   const [showHighlightPicker, setShowHighlightPicker] = useState(false)
   const [showTextColorPicker, setShowTextColorPicker] = useState(false)
-  const [showImportModal,  setShowImportModal]  = useState(false)
-  const [compacting,       setCompacting]       = useState(false)
+  const [showImportModal,    setShowImportModal]    = useState(false)
+  const [showDownloadModal,  setShowDownloadModal]  = useState(false)
+  const [compacting,         setCompacting]         = useState(false)
 
   const fontDropdownRef = useRef(null)
   const sizeDropdownRef = useRef(null)
@@ -395,10 +398,22 @@ export default function StyleBar() {
           <Upload size={14} />
           Importer
         </button>
+
+        <button
+          className="stylebar-import-btn"
+          title="Télécharger les données (CSV ou PDF)"
+          onClick={() => setShowDownloadModal(true)}
+        >
+          <Download size={14} />
+          Télécharger
+        </button>
       </div>
 
       {showImportModal && (
         <ImportModal onClose={() => setShowImportModal(false)} />
+      )}
+      {showDownloadModal && (
+        <DownloadModal onClose={() => setShowDownloadModal(false)} />
       )}
     </div>
   )

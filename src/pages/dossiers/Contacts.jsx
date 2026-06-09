@@ -62,11 +62,14 @@ function useContacts() {
     const cellsB = sheets['btob']?.cells || {}
     pushRows(cellsB, colB, 'NOM_PRENOM', 'b')
 
-    // Sort then deduplicate by name — same client can have multiple transaction rows
+    // Sort then deduplicate by e-mail — same client can have multiple transaction rows.
+    // Two different clients can share the same name, so the e-mail is the reliable key
+    // (rows without e-mail can't be compared reliably and are kept as-is).
     rows.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
     const seen = new Set()
     return rows.filter(r => {
-      const key = r.nom.toLowerCase().trim()
+      const key = r.email.toLowerCase().trim()
+      if (!key) return true
       if (seen.has(key)) return false
       seen.add(key)
       return true

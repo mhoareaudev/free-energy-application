@@ -913,6 +913,79 @@ export const SpreadsheetProvider = ({ children }) => {
     return nextRow
   }, [saveToHistory])
 
+  // Batch import multiple rows across sheets in a single state update (avoids row collisions)
+  const batchImportRows = useCallback((importRows) => {
+    saveToHistory()
+    markDirty()
+
+    setSheets(prev => {
+      const next = { ...prev }
+
+      // Group by sheetId
+      const bySheet = {}
+      importRows.forEach(row => {
+        if (!bySheet[row.sheetId]) bySheet[row.sheetId] = []
+        bySheet[row.sheetId].push(row)
+      })
+
+      Object.entries(bySheet).forEach(([sheetId, rows]) => {
+        const currentSheet = next[sheetId] || { cells: {}, styles: {} }
+        const newCells = { ...currentSheet.cells }
+        const colMap = getColumnIdToLetterMap(sheetId)
+
+        // Build set of already-used rows (from existing + rows added in this batch)
+        const usedRows = new Set()
+        Object.keys(newCells).forEach(key => {
+          if (key.startsWith('__')) return
+          if (!newCells[key]) return
+          const m = key.match(/^[A-Z]+(\d+)$/)
+          if (m) { const r = parseInt(m[1]); if (r >= 2) usedRows.add(r) }
+        })
+
+        rows.forEach(row => {
+          let nextRow = 2
+          while (usedRows.has(nextRow)) nextRow++
+          usedRows.add(nextRow)
+
+          const setCell = (colId, value) => {
+            if (value !== undefined && value !== null && String(value).trim() !== '' && colMap[colId]) {
+              newCells[`${colMap[colId]}${nextRow}`] = String(value)
+            }
+          }
+
+          const clientCol = sheetId === 'btoc-comptant' ? 'Colonne1' : 'NOM_PRENOM'
+          setCell(clientCol, row.clientName)
+          setCell('COMMERCIAL', row.commercial)
+          setCell('EMAIL', row.email)
+          setCell('TELEPHONE', row.tel)
+          setCell('ADRESSE_INSTALLATION', row.adresse)
+          setCell('VILLE', row.ville)
+          setCell('CODE_POSTAL', row.codePostal)
+          setCell('DATE_DDE_VT', row.dateDemandeVT)
+          setCell('DATE_PREV_VT', row.dateVT)
+          setCell('DATE_RETOUR_VT', row.dateRetourVT)
+          setCell('PUISSANCE_PREVI', row.puissance)
+          setCell('ETAT_DOSSIER', row.etatDossier)
+          setCell('CHARGES_AFFAIRES', row.chargesAffaires)
+          setCell('DEMANDE_DP', row.demandeDp)
+          setCell('N_DP', row.nDp)
+          setCell('DATE_PREV_POSE', row.datePrevPose)
+          setCell('DATE_REELLE_POSE', row.dateReellePose)
+          setCell('DATE_POSE', row.dateReellePose)
+          setCell('MES_EDF', row.mesEdf)
+
+          if (row.vtFormData) {
+            newCells[`__vtFormData:${nextRow}`] = JSON.stringify(row.vtFormData)
+          }
+        })
+
+        next[sheetId] = { ...currentSheet, cells: newCells }
+      })
+
+      return next
+    })
+  }, [saveToHistory])
+
   // Compact all rows of a sheet: move data to rows 2, 3, 4... with no gaps.
   // Also updates Supabase foreign keys in contact_activities, contact_task_lists, contact_metadata.
   const compactRows = useCallback(async (sheetId) => {
@@ -1045,6 +1118,7 @@ export const SpreadsheetProvider = ({ children }) => {
     addVTRequest,
     addContactRow,
     clearContactRow,
+    batchImportRows,
     compactRows,
     vtFormData,
     loading,

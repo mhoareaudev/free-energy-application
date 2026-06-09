@@ -2,19 +2,20 @@ import { useMemo, useState, useRef, useEffect } from 'react'
 import {
   Zap, ChevronDown, Settings2, Search, ArrowUpDown,
   SlidersHorizontal, X, Download, Save, RotateCcw, CheckCircle2,
-  LayoutList, LayoutGrid,
+  LayoutList, LayoutGrid, Upload, Trash2, AlertTriangle,
 } from 'lucide-react'
 import { useSpreadsheet } from '../../context/SpreadsheetContext'
 import { getColumnIdToLetterMap } from '../../data/sheetsConfig'
 import { DOSSIER_STAGES, STAGE_COLOR_MAP } from '../../data/stagesConfig'
 import DossierListPage, { DossierBadge } from './DossierListPage'
 import { PIPELINE_NAME_KEY } from '../PipelineConfig'
-import { supabaseGet, supabasePost, supabaseUpsert } from '../../lib/supabase'
+import { supabaseGet, supabasePost, supabaseUpsert, supabaseDelete } from '../../lib/supabase'
 import { sendVTRequestEmail } from '../../utils/sendVTEmail'
 import { useAuth } from '../../context/AuthContext'
 import { useNotifications } from '../../context/NotificationContext'
 import { formatDateFR } from '../../utils/dateUtils'
 import TransactionDetail from './TransactionDetail'
+import ImportPreviewModal from '../../components/ImportPreviewModal'
 import './Transactions.css'
 
 // ── Phase badge (basé sur les étapes d'accordéon) ────────────
@@ -586,7 +587,7 @@ function KanbanView({ rows, onRowClick }) {
 }
 
 // ── Pipeline controls ─────────────────────────────────────────
-function PipelineControls({ count, pipelineName, onToggleSettings, settingsActive, searchQuery, onSearchChange, view, onViewChange }) {
+function PipelineControls({ count, pipelineName, onToggleSettings, settingsActive, searchQuery, onSearchChange, view, onViewChange, onImport }) {
   const [pipelineOpen, setPipelineOpen] = useState(false)
   const [searchActive, setSearchActive] = useState(false)
   const pipelineRef    = useRef(null)
@@ -656,6 +657,13 @@ function PipelineControls({ count, pipelineName, onToggleSettings, settingsActiv
       <button className={`tx-ctrl-btn ${settingsActive ? 'tx-ctrl-btn--active' : ''}`} onClick={onToggleSettings} title="Paramètres">
         <SlidersHorizontal size={14} />
       </button>
+
+      <div className="tx-ctrl-sep" />
+
+      <button className="tx-ctrl-btn tx-ctrl-btn--import" onClick={onImport} title="Importer des visites">
+        <Upload size={14} />
+        <span className="tx-import-label">Importer</span>
+      </button>
     </div>
   )
 }
@@ -721,9 +729,15 @@ function exportToPDF(rows, pipelineName) {
 export default function Transactions() {
   const rows    = useTransactions()
   const COLUMNS = useMemo(() => makeColumns(), [])
+  const { clearContactRow } = useSpreadsheet()
 
-  const [showSettings,        setShowSettings]        = useState(false)
-  const [showAdd,             setShowAdd]             = useState(false)
+  const [showSettings,          setShowSettings]          = useState(false)
+  const [showAdd,               setShowAdd]               = useState(false)
+  const [showImport,            setShowImport]            = useState(false)
+  const [selectedIds,           setSelectedIds]           = useState(new Set())
+  const [selectionVersion,      setSelectionVersion]      = useState(0)
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+  const [bulkDeleting,          setBulkDeleting]          = useState(false)
   const [searchQuery,         setSearchQuery]         = useState('')
   const [toast,               setToast]               = useState(null)
   const [activeTransactionId, setActiveTransactionId] = useState(() => {
@@ -770,6 +784,27 @@ export default function Transactions() {
     localStorage.setItem(PIPELINE_NAME_KEY, pipelineName)
     setSavedName(pipelineName)
     window.dispatchEvent(new Event('pipelineUpdated'))
+  }
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true)
+    await Promise.allSettled(
+      [...selectedIds].map(async id => {
+        const [prefix, rowStr] = id.split(':')
+        const rowNum  = parseInt(rowStr)
+        const sheetId = prefix === 'c' ? 'btoc-comptant' : prefix === 'a' ? 'btoc-abonnement' : 'btob'
+        clearContactRow(sheetId, rowNum)
+        await Promise.allSettled([
+          supabaseDelete('contact_activities', { contact_id: `eq.${id}` }),
+          supabaseDelete('contact_task_lists',  { contact_id: `eq.${id}` }),
+          supabaseDelete('contact_metadata',    { contact_id: `eq.${id}` }),
+          supabaseDelete('vt_requests',         { contact_id: `eq.${id}` }),
+        ])
+      })
+    )
+    setBulkDeleting(false)
+    setShowBulkDeleteConfirm(false)
+    setSelectionVersion(v => v + 1)
   }
 
   const handleReset = () => {
@@ -823,8 +858,27 @@ export default function Transactions() {
             onSearchChange={setSearchQuery}
             view={view}
             onViewChange={setView}
+            onImport={() => setShowImport(true)}
           />
         }
+        onSelectionChange={setSelectedIds}
+        selectionVersion={selectionVersion}
+        bulkBar={(count, clearSelection) => (
+          <div className="tx-bulk-bar">
+            <span className="tx-bulk-count">{count} sélectionnée{count > 1 ? 's' : ''}</span>
+            <button
+              className="tx-bulk-delete-btn"
+              onClick={() => setShowBulkDeleteConfirm(true)}
+            >
+              <Trash2 size={13} />
+              Supprimer ({count})
+            </button>
+            <button className="tx-bulk-cancel-btn" onClick={clearSelection}>
+              <X size={13} />
+              Annuler
+            </button>
+          </div>
+        )}
       />
       {showAdd && (
         <AddTransactionPanel
@@ -841,6 +895,31 @@ export default function Transactions() {
           onReset={handleReset}
           onClose={() => setShowSettings(false)}
         />
+      )}
+      {showImport && (
+        <ImportPreviewModal onClose={() => setShowImport(false)} />
+      )}
+      {showBulkDeleteConfirm && (
+        <div className="tx-bulk-overlay" onClick={() => !bulkDeleting && setShowBulkDeleteConfirm(false)}>
+          <div className="tx-bulk-modal" onClick={e => e.stopPropagation()}>
+            <div className="tx-bulk-modal-header">
+              <div className="tx-bulk-modal-icon"><AlertTriangle size={20} /></div>
+              <div>
+                <div className="tx-bulk-modal-title">Supprimer {selectedIds.size} transaction{selectedIds.size > 1 ? 's' : ''}</div>
+                <div className="tx-bulk-modal-sub">Cette action est irréversible. Les contacts associés seront aussi supprimés.</div>
+              </div>
+            </div>
+            <div className="tx-bulk-modal-footer">
+              <button className="tx-bulk-modal-cancel" onClick={() => setShowBulkDeleteConfirm(false)} disabled={bulkDeleting}>
+                Annuler
+              </button>
+              <button className="tx-bulk-modal-confirm" onClick={handleBulkDelete} disabled={bulkDeleting}>
+                <Trash2 size={13} />
+                {bulkDeleting ? 'Suppression…' : 'Supprimer définitivement'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

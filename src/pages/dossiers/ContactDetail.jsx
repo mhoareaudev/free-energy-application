@@ -102,16 +102,18 @@ function computePhaseKey(cells, colMap, row, sheetId) {
 }
 
 // ── Contact transactions (all rows matching this client name) ─
-function useContactTransactions(nom, slotMap) {
+function useContactTransactions(nom, email, slotMap) {
   const { sheets } = useSpreadsheet()
   return useMemo(() => {
     if (!nom) return []
-    const normalizedNom = nom.toLowerCase().trim()
+    const normalizedNom   = nom.toLowerCase().trim()
+    const normalizedEmail = (email || '').toLowerCase().trim()
     const results = []
 
     const process = (cells, colMap, nameColId, prefix, sheetId, typeLabel, typeKey) => {
       const nameLetter       = colMap[nameColId]
       const commercialLetter = colMap['COMMERCIAL']
+      const emailLetter      = colMap['EMAIL']
       if (!nameLetter || !commercialLetter) return
       const rowSet = new Set()
       Object.keys(cells).forEach(k => {
@@ -122,6 +124,12 @@ function useContactTransactions(nom, slotMap) {
       rowSet.forEach(r => {
         const rowNom = cells[`${nameLetter}${r}`]
         if (!rowNom || rowNom.toLowerCase().trim() !== normalizedNom) return
+        // Same name can belong to different real clients — when the contact has an
+        // e-mail, only attach rows sharing that e-mail (avoids mixing homonyms)
+        if (normalizedEmail) {
+          const rowEmail = emailLetter ? (cells[`${emailLetter}${r}`] || '').toLowerCase().trim() : ''
+          if (rowEmail !== normalizedEmail) return
+        }
         const commercial = cells[`${commercialLetter}${r}`]
         if (!commercial) return
         const cancelled = (() => { try { return JSON.parse(cells[`__cancelled:${r}`] || 'null') } catch { return null } })()
@@ -884,7 +892,7 @@ export default function ContactDetail({ contactId, onBack, onTransactionClick, o
   const typeLabel  = isIlio ? 'Tickets Ilio Systems'         : (sheetId === 'btob' ? 'BtoB' : sheetId === 'btoc-comptant' ? 'Comptant' : 'Abonnement')
 
   const slotMap      = useSlotMap()
-  const transactions = useContactTransactions(nom, slotMap)
+  const transactions = useContactTransactions(nom, email, slotMap)
 
   const [activities, setActivities] = useState([])
   const [activeTab, setActiveTab]   = useState('all')
@@ -963,8 +971,10 @@ export default function ContactDetail({ contactId, onBack, onTransactionClick, o
   const handleDelete = async () => {
     setDeleting(true)
 
-    // Find every row across all 3 sheets that matches this client's name
-    const normalizedNom = nom.toLowerCase().trim()
+    // Find every row across all 3 sheets that matches this client (by name, and by
+    // e-mail when available — two different clients can share the same name)
+    const normalizedNom   = nom.toLowerCase().trim()
+    const normalizedEmail = (email || '').toLowerCase().trim()
     const sheetConfigs = [
       { id: 'btoc-comptant',   nameColId: 'Colonne1',   prefix: 'c' },
       { id: 'btoc-abonnement', nameColId: 'NOM_PRENOM', prefix: 'a' },
@@ -975,7 +985,8 @@ export default function ContactDetail({ contactId, onBack, onTransactionClick, o
     for (const cfg of sheetConfigs) {
       const cm    = getColumnIdToLetterMap(cfg.id)
       const sc    = sheets[cfg.id]?.cells || {}
-      const nameLetter = cm[cfg.nameColId]
+      const nameLetter  = cm[cfg.nameColId]
+      const emailLetter = cm['EMAIL']
       if (!nameLetter) continue
       const rowSet = new Set()
       Object.keys(sc).forEach(k => {
@@ -985,8 +996,12 @@ export default function ContactDetail({ contactId, onBack, onTransactionClick, o
       })
       rowSet.forEach(r => {
         const rowNom = sc[`${nameLetter}${r}`]
-        if (rowNom && rowNom.toLowerCase().trim() === normalizedNom)
-          matches.push({ sheetId: cfg.id, rowNum: r, contactId: `${cfg.prefix}:${r}` })
+        if (!rowNom || rowNom.toLowerCase().trim() !== normalizedNom) return
+        if (normalizedEmail) {
+          const rowEmail = emailLetter ? (sc[`${emailLetter}${r}`] || '').toLowerCase().trim() : ''
+          if (rowEmail !== normalizedEmail) return
+        }
+        matches.push({ sheetId: cfg.id, rowNum: r, contactId: `${cfg.prefix}:${r}` })
       })
     }
 
