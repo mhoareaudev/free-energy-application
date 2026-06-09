@@ -241,13 +241,6 @@ export default function CRMModal({ isOpen, onClose, data }) {
     // Save form data
     setCellValue(data.activeSheet, `__vtTechForm:${data.rowNumber}`, JSON.stringify(formState))
 
-    // Set DATE_RETOUR_VT to today
-    const colMap = getColumnIdToLetterMap(data.activeSheet)
-    const vtLetter = colMap['DATE_RETOUR_VT']
-    if (vtLetter) {
-      setCellValue(data.activeSheet, `${vtLetter}${data.rowNumber}`, isoToDMY(formState.dateRetour))
-    }
-
     await saveData()
     setToast({ msg: 'Visite technique envoyée !', type: 'success' })
     setTimeout(() => {

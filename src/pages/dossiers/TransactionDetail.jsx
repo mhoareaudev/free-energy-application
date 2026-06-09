@@ -1561,10 +1561,6 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
     setCellValue(sheetId, `__vtFormData:${rowNum}`, JSON.stringify(full))
     setVtFormData(full)
 
-    // Auto-set DATE_RETOUR_VT to today (Réunion time)
-    const drLetter = colMap['DATE_RETOUR_VT']
-    if (drLetter) setCellValue(sheetId, `${drLetter}${rowNum}`, saveDate)
-
     setShowVtModal(false)
     setToast('Fiche VT sauvegardée')
 
