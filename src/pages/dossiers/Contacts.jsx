@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Users, X, CheckCircle2 } from 'lucide-react'
 import { useSpreadsheet } from '../../context/SpreadsheetContext'
-import { getColumnIdToLetterMap } from '../../data/sheetsConfig'
+import { getColumnIdToLetterMap, PVLEASE_OFFERS } from '../../data/sheetsConfig'
 import DossierListPage from './DossierListPage'
 import ContactDetail from './ContactDetail'
 import TransactionDetail from './TransactionDetail'
@@ -208,7 +208,10 @@ function AddContactPanel({ onClose, onCreated }) {
       .then(data => setCommerciaux(data))
   }, [])
 
-  const handleChange = e => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  const handleChange = e => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value, ...(name === 'typeContrat' ? { puissance: '' } : {}) }))
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -424,10 +427,22 @@ function AddContactPanel({ onClose, onCreated }) {
                 {formData.typeClient === 'btob' && <span className="form-hint">BtoB utilise un onglet dédié</span>}
               </div>
 
-              <div className="form-group">
-                <label>Puissance envisagée (kWc)</label>
-                <input type="text" name="puissance" value={formData.puissance} onChange={handleChange} placeholder="Ex: 3, 6, 9..." disabled={!formData.commercial} />
-              </div>
+              {formData.typeContrat === 'abonnement' ? (
+                <div className="form-group">
+                  <label>Offre choisie</label>
+                  <select name="puissance" value={formData.puissance} onChange={handleChange} disabled={!formData.commercial}>
+                    <option value="">Sélectionnez une offre</option>
+                    {PVLEASE_OFFERS.map(offre => (
+                      <option key={offre} value={offre}>{offre}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label>Puissance envisagée (kWc)</label>
+                  <input type="text" name="puissance" value={formData.puissance} onChange={handleChange} placeholder="Ex: 3, 6, 9..." disabled={!formData.commercial} />
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Onduleurs</label>

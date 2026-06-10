@@ -8,7 +8,9 @@ function buildVTEmailHtml(vars) {
   const adresse = [vars.adresse, vars.code_postal, vars.ville].filter(Boolean).join(', ') || '—'
   const tel = vars.telephone || '—'
   const contrat = vars.type_contrat || '—'
-  const puissance = vars.puissance ? `${vars.puissance} kWc` : '—'
+  const isAbonnement = vars.type_contrat === 'abonnement'
+  const puissance = vars.puissance ? (isAbonnement ? vars.puissance : `${vars.puissance} kWc`) : '—'
+  const puissanceLabel = isAbonnement ? 'Offre choisie' : 'Puissance'
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -97,7 +99,7 @@ function buildVTEmailHtml(vars) {
                       <td style="padding:4px 0;font-size:13px;color:#1e293b;">${contrat}</td>
                     </tr>
                     ${puissance !== '—' ? `<tr>
-                      <td style="padding:4px 0;font-size:13px;color:#64748b;">Puissance</td>
+                      <td style="padding:4px 0;font-size:13px;color:#64748b;">${puissanceLabel}</td>
                       <td style="padding:4px 0;font-size:13px;color:#1e293b;">${puissance}</td>
                     </tr>` : ''}
                   </table>

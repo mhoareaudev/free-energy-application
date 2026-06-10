@@ -5,7 +5,7 @@ import {
   LayoutList, LayoutGrid, Upload, Trash2, AlertTriangle,
 } from 'lucide-react'
 import { useSpreadsheet } from '../../context/SpreadsheetContext'
-import { getColumnIdToLetterMap } from '../../data/sheetsConfig'
+import { getColumnIdToLetterMap, PVLEASE_OFFERS } from '../../data/sheetsConfig'
 import { DOSSIER_STAGES, STAGE_COLOR_MAP } from '../../data/stagesConfig'
 import DossierListPage, { DossierBadge } from './DossierListPage'
 import { PIPELINE_NAME_KEY } from '../PipelineConfig'
@@ -285,7 +285,10 @@ export function AddTransactionPanel({ onClose, onCreated, lockedContact = null }
     setShowDropdown(false)
   }
 
-  const handleChange = e => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  const handleChange = e => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value, ...(name === 'typeContrat' ? { puissance: '' } : {}) }))
+  }
   const canSubmit = !!(selectedContact && formData.commercial)
 
   const handleSubmit = async e => {
@@ -490,14 +493,26 @@ export function AddTransactionPanel({ onClose, onCreated, lockedContact = null }
                 )}
               </div>
 
-              <div className="form-group">
-                <label>Puissance envisagée (kWc)</label>
-                <input
-                  type="text" name="puissance"
-                  value={formData.puissance} onChange={handleChange}
-                  placeholder="Ex: 3, 6, 9…"
-                />
-              </div>
+              {formData.typeContrat === 'abonnement' ? (
+                <div className="form-group">
+                  <label>Offre choisie</label>
+                  <select name="puissance" value={formData.puissance} onChange={handleChange}>
+                    <option value="">Sélectionnez une offre</option>
+                    {PVLEASE_OFFERS.map(offre => (
+                      <option key={offre} value={offre}>{offre}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label>Puissance envisagée (kWc)</label>
+                  <input
+                    type="text" name="puissance"
+                    value={formData.puissance} onChange={handleChange}
+                    placeholder="Ex: 3, 6, 9…"
+                  />
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Onduleurs</label>

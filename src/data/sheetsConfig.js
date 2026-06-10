@@ -23,6 +23,16 @@ export const SHEETS = [
   },
 ]
 
+// Offres PVLEASE disponibles pour les contrats en abonnement (3 / 6 / 9 kWc)
+export const PVLEASE_OFFERS = ['PVLEASE', 'PVLEASE+', 'PVLEASE Max']
+
+// Puissance (kWc) correspondant à chaque offre PVLEASE (pour le formulaire de demande de VT)
+export const PVLEASE_OFFER_KWC = {
+  'PVLEASE': '3',
+  'PVLEASE+': '6',
+  'PVLEASE Max': '9',
+}
+
 // Color palette: border (contours), dark (lettres + groupes), medium (titres colonnes), light (cellules)
 const COLORS = {
   jaune:     { border: '#E5A700', dark: '#FCD34D', medium: '#FDE68A', light: '#FFFBEB' },

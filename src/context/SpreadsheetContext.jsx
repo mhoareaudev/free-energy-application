@@ -852,6 +852,12 @@ export const SpreadsheetProvider = ({ children }) => {
         setCell('ECHEANCE', addDaysToFR(data.dateDemandeVT, 7))
         setCell('CHARGES_AFFAIRES', data.chargesAffaires)
 
+        // Abonnement : l'offre PVLEASE choisie (PVLEASE / PVLEASE+ / PVLEASE Max) et la batterie
+        if (sheetId === 'btoc-abonnement') {
+          setCell('OFFRE_CHOISIE', data.vtFormData.puissance)
+          setCell('OPTION_CONFORT', data.vtFormData.batterie)
+        }
+
         // Persist full VT form data for PDF generation (survives page reload)
         newCells[`__vtFormData:${nextRow}`] = JSON.stringify(data.vtFormData)
       }

@@ -3,6 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { X, Save, FileText } from 'lucide-react'
 import templateUrl from '../assets/formulaire_vt.pdf'
+import { PVLEASE_OFFER_KWC } from '../data/sheetsConfig'
 import './PdfFormViewer.css'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl
@@ -42,7 +43,7 @@ function vtToPdfFields(data) {
     type_abonnement:     chk(data.typeContrat === 'abonnement'),
     oui_maintenance:     chk(data.contratMaintenance === 'oui'),
     non_maintenance:     chk(data.contratMaintenance === 'non'),
-    'puissance_souhaitée': txt(data.puissance),
+    'puissance_souhaitée': txt(data.typeContrat === 'abonnement' ? (PVLEASE_OFFER_KWC[data.puissance] || data.puissance) : data.puissance),
     stockage_text:       txt(data.batterie),
     adresse_pose:        txt(data.adresse),
     code_postal:         txt(data.codePostal),

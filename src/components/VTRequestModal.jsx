@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { formatDateFR } from '../utils/dateUtils'
 import { X } from 'lucide-react'
 import { supabaseGet, supabasePost } from '../lib/supabase'
+import { PVLEASE_OFFERS } from '../data/sheetsConfig'
 import { useAuth } from '../context/AuthContext'
 import { useSpreadsheet } from '../context/SpreadsheetContext'
 import { useNotifications } from '../context/NotificationContext'
@@ -42,7 +43,7 @@ export default function VTRequestModal({ isOpen, onClose }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    setFormData(prev => ({ ...prev, [name]: value, ...(name === 'typeContrat' ? { puissance: '' } : {}) }))
   }
 
   // Determine which sheet to use based on type_client and type_contrat
@@ -259,17 +260,34 @@ export default function VTRequestModal({ isOpen, onClose }) {
 
               <div className="form-section-title">Projet</div>
 
-              <div className="form-group">
-                <label htmlFor="puissance">Puissance envisagée (kWc)</label>
-                <input
-                  type="text"
-                  id="puissance"
-                  name="puissance"
-                  value={formData.puissance}
-                  onChange={handleChange}
-                  placeholder="Ex: 3, 6, 9..."
-                />
-              </div>
+              {formData.typeContrat === 'abonnement' ? (
+                <div className="form-group">
+                  <label htmlFor="puissance">Offre choisie</label>
+                  <select
+                    id="puissance"
+                    name="puissance"
+                    value={formData.puissance}
+                    onChange={handleChange}
+                  >
+                    <option value="">Sélectionnez une offre</option>
+                    {PVLEASE_OFFERS.map(offre => (
+                      <option key={offre} value={offre}>{offre}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label htmlFor="puissance">Puissance envisagée (kWc)</label>
+                  <input
+                    type="text"
+                    id="puissance"
+                    name="puissance"
+                    value={formData.puissance}
+                    onChange={handleChange}
+                    placeholder="Ex: 3, 6, 9..."
+                  />
+                </div>
+              )}
 
               <div className="form-group">
                 <label htmlFor="adresse">Adresse</label>
