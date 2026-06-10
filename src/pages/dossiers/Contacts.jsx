@@ -204,7 +204,7 @@ function AddContactPanel({ onClose, onCreated }) {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    supabaseGet('commerciaux', { select: 'id,nom,prenom', order: 'nom.asc' })
+    supabaseGet('profiles', { role: 'eq.commercial', select: 'id,nom,prenom', order: 'nom.asc' })
       .then(data => setCommerciaux(data))
   }, [])
 

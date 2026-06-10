@@ -1001,6 +1001,13 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
       .catch(() => {})
   }, [])
 
+  const [commerciaux, setCommerciaux] = useState([])
+  useEffect(() => {
+    supabaseGet('profiles', { role: 'eq.commercial', select: 'id,prenom,nom,identifiant' })
+      .then(data => setCommerciaux(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [])
+
   const [contactType, setContactType] = useState('')
   useEffect(() => {
     supabaseGet('contact_metadata', { contact_id: `eq.${transactionId}`, select: 'contact_type' })
@@ -1731,8 +1738,27 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
 
           <div className="td-info-section">
             <div className="td-info-header">Informations clés</div>
+            <div className="td-info-row">
+              <div className="td-info-label">Commercial</div>
+              <select
+                className="td-ca-select"
+                value={commercial}
+                onChange={e => {
+                  const letter = colMap['COMMERCIAL']
+                  if (letter) setCellValue(sheetId, `${letter}${rowNum}`, e.target.value)
+                }}
+              >
+                <option value="">— Sélectionner —</option>
+                {commercial && !commerciaux.some(c => [c.prenom, c.nom].filter(Boolean).join(' ') === commercial) && (
+                  <option value={commercial}>{commercial}</option>
+                )}
+                {commerciaux.map(c => {
+                  const fullName = [c.prenom, c.nom].filter(Boolean).join(' ')
+                  return <option key={c.id} value={fullName}>{fullName}</option>
+                })}
+              </select>
+            </div>
             {[
-              { label: 'Commercial',  value: commercial },
               { label: 'Adresse',     value: adresse    },
               { label: 'Code postal', value: codePostal },
               { label: 'Ville',       value: ville      },

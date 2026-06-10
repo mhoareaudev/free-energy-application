@@ -6,7 +6,7 @@ import {
   UserPlus, Edit2, Save, Users, Building2, Zap, Table2, LogOut, Ticket, Mail, Loader,
 } from 'lucide-react'
 import RichTextEditor, { VT_EMAIL_VARIABLES } from '../components/RichTextEditor'
-import { supabase, supabaseGet, supabaseUpsert, supabaseDelete } from '../lib/supabase'
+import { supabase, supabaseGet, supabaseUpsert, supabaseInvoke } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import '../components/Sidebar.css'
 import './PipelineConfig.css'
@@ -247,25 +247,38 @@ function TeamManagement() {
 
   const saveEdit = async id => {
     setSavingId(id)
-    await supabaseUpsert('profiles', { id, ...editData }, 'id')
-    setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...editData } : p))
+    try {
+      await supabaseInvoke('manage-team', { action: 'update', payload: { id, ...editData } })
+      setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...editData } : p))
+    } catch (e) {
+      alert(e.message || 'Erreur lors de la mise à jour du membre.')
+    }
     setEditingId(null); setSavingId(null)
   }
 
   const handleDelete = async id => {
-    await supabaseDelete('profiles', { id: `eq.${id}` })
-    setProfiles(prev => prev.filter(p => p.id !== id))
+    try {
+      await supabaseInvoke('manage-team', { action: 'delete', payload: { id } })
+      setProfiles(prev => prev.filter(p => p.id !== id))
+    } catch (e) {
+      alert(e.message || 'Erreur lors de la suppression du membre.')
+    }
     setDeleteConfirm(null)
   }
 
   const handleAdd = async () => {
     setAddError(''); setAddLoading(true)
     try {
-      const { data, error } = await supabase.auth.signUp({ email: addForm.identifiant, password: addForm.password })
-      if (error) throw error
-      const userId = data.user?.id
-      if (!userId) throw new Error('Confirmation par e-mail requise — le compte sera actif après confirmation.')
-      await supabaseUpsert('profiles', { id: userId, prenom: addForm.prenom, nom: addForm.nom, role: addForm.role, identifiant: addForm.identifiant }, 'id')
+      await supabaseInvoke('manage-team', {
+        action: 'create',
+        payload: {
+          prenom: addForm.prenom,
+          nom: addForm.nom,
+          identifiant: addForm.identifiant,
+          password: addForm.password,
+          role: addForm.role,
+        },
+      })
       setShowAdd(false)
       setAddForm({ prenom: '', nom: '', identifiant: '', password: '', role: 'commercial' })
       loadProfiles()
@@ -381,7 +394,12 @@ function TeamManagement() {
                               setEditData(p => ({ ...p, role }))
                             } else {
                               setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, role } : p))
-                              await supabaseUpsert('profiles', { id: profile.id, role }, 'id')
+                              try {
+                                await supabaseInvoke('manage-team', { action: 'update', payload: { id: profile.id, role } })
+                              } catch (e) {
+                                alert(e.message || 'Erreur lors de la mise à jour du rôle.')
+                                loadProfiles()
+                              }
                             }
                           }}
                         >

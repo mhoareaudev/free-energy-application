@@ -132,6 +132,37 @@
   margin-left: 4px;
 }
 
+.dash-daily-nav {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.dash-daily-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.dash-daily-arrow:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.dash-daily-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .dash-empty {
   flex: 1;
   display: flex;
@@ -143,12 +174,71 @@
   padding: 24px 0;
 }
 
+/* ── Performance commerciaux : graphique + colonne VT du mois ── */
+.dash-comm-perf {
+  display: flex;
+  gap: 18px;
+  flex: 1;
+  min-height: 130px;
+}
+
+.dash-comm-vt-side {
+  flex: 0 0 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 14px;
+  background: linear-gradient(160deg, #fef3e2 0%, #fde7d4 100%);
+  text-align: center;
+}
+
+.dash-comm-vt-icon {
+  margin-bottom: 2px;
+}
+
+.dash-comm-vt-icon--up   { color: #16a34a; }
+.dash-comm-vt-icon--down { color: #ef4444; }
+.dash-comm-vt-icon--flat { color: #94a3b8; }
+
+.dash-comm-vt-big {
+  font-size: 38px;
+  font-weight: 800;
+  background: linear-gradient(160deg, #f97316 0%, #ea580c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  line-height: 1;
+}
+
+.dash-comm-vt-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #c2680f;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.dash-comm-vt-evol {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.dash-comm-vt-evol--up   { color: #16a34a; }
+.dash-comm-vt-evol--down { color: #ef4444; }
+
 /* ── Vertical bar chart ── */
 .dash-bar-chart {
   display: flex;
   align-items: flex-end;
   gap: 5px;
-  height: 130px;
+  flex: 1;
+  min-height: 130px;
+  padding-top: 22px;
 }
 
 .dash-bar-col {
@@ -167,6 +257,10 @@
   align-items: flex-end;
   justify-content: center;
   position: relative;
+}
+
+.dash-bar-chart--thin .dash-bar-fill {
+  width: 36%;
 }
 
 .dash-bar-fill {
@@ -213,7 +307,7 @@
   display: flex;
   justify-content: space-between;
   padding: 0 8px;
-  margin-top: -2px;
+  margin-top: 10px;
 }
 
 .dash-line-label {

@@ -1,20 +1,28 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import {
-  FolderOpen, TrendingUp, Zap, Euro, Users, BarChart2, Activity,
+  FolderOpen, TrendingUp, TrendingDown, Minus, Zap, Euro, Users, BarChart2, Activity,
   Mail, CheckCircle, XCircle, RefreshCw, MailOpen, Wrench, Clock,
   FileCheck, Calendar, AlertTriangle, Target, Hammer, ClipboardList,
-  CreditCard, ShieldCheck, Package,
+  CreditCard, ShieldCheck, Package, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useSpreadsheet } from '../context/SpreadsheetContext'
 import { useAuth, ROLES } from '../context/AuthContext'
 import { getColumnIdToLetterMap } from '../data/sheetsConfig'
 import { STAGE_COLOR_MAP } from '../data/stagesConfig'
-import { supabaseInvoke } from '../lib/supabase'
+import { supabaseGet, supabaseInvoke } from '../lib/supabase'
 import './Dashboard.css'
 
 // ── Helpers ──────────────────────────────────────────────────
 const parseDateFR = str => {
   if (!str) return null
+  // Format ISO importé (AAAA-MM-JJ)
+  if (str.includes('-')) {
+    const p = str.split('-')
+    if (p.length !== 3 || p[0].length !== 4) return null
+    const d = new Date(+p[0], +p[1] - 1, +p[2])
+    return isNaN(d) ? null : d
+  }
+  // Format FR (JJ/MM/AAAA)
   const p = str.split('/')
   if (p.length !== 3) return null
   const d = new Date(+p[2], +p[1] - 1, +p[0])
@@ -26,7 +34,7 @@ const fmtEUR = n =>
   : `${Math.round(n)} €`
 
 // ── Data hook (all 3 sheets) ─────────────────────────────────
-function useDashboardData(loggedInName, role) {
+function useDashboardData(loggedInName, role, activeCommerciaux) {
   const { sheets } = useSpreadsheet()
 
   return useMemo(() => {
@@ -112,22 +120,21 @@ function useDashboardData(loggedInName, role) {
       return { label: new Date(+y, +m-1, 1).toLocaleDateString('fr-FR', { month: 'short' }), count }
     })
 
-    // Daily — 30 derniers jours (label tous les 7 jours)
-    const daily30 = []
-    for (let i = 29; i >= 0; i--) {
+    // Daily — 90 derniers jours (paginable par tranches de 14 jours)
+    const dailyAll = []
+    for (let i = 89; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)
       const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-      const label = (i % 7 === 0 || i === 0) ? `${d.getDate()}/${d.getMonth()+1}` : ''
-      daily30.push({ iso, label, count: 0 })
+      dailyAll.push({ iso, label: `${d.getDate()}/${d.getMonth()+1}`, count: 0 })
     }
     allRows.forEach(r => {
       const dateStr = r.signeLe || r.dateDdeVT
       const d = parseDateFR(dateStr); if (!d) return
       const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-      const entry = daily30.find(e => e.iso === iso)
+      const entry = dailyAll.find(e => e.iso === iso)
       if (entry) entry.count++
     })
-    const daily = daily30.map(({ label, count }) => ({ label, count }))
+    const daily = dailyAll.map(({ label, count }) => ({ label, count }))
 
     // Pipeline de suivi technique (progression post-signature)
     const pipeline = [
@@ -141,18 +148,36 @@ function useDashboardData(loggedInName, role) {
 
     // Commerciaux performance (tous les dossiers leur sont attribués)
     const commSource = isCommercial ? rows : allRows
+    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const commMap = {}
     commSource.forEach(r => {
       const n = r.commercial || 'Inconnu'
-      if (!commMap[n]) commMap[n] = { total: 0, ca: 0, poses: 0 }
+      if (!commMap[n]) commMap[n] = { total: 0, ca: 0, poses: 0, vtCeMois: 0, vtMoisPrec: 0 }
       commMap[n].total++
       commMap[n].ca += r.totalTTC || r.montantAbt
       if (r.dateReellePose) commMap[n].poses++
+      const dVT = parseDateFR(r.dateDdeVT)
+      if (dVT && dVT.getMonth() === now.getMonth() && dVT.getFullYear() === now.getFullYear()) {
+        commMap[n].vtCeMois++
+      }
+      if (dVT && dVT.getMonth() === prevMonthDate.getMonth() && dVT.getFullYear() === prevMonthDate.getFullYear()) {
+        commMap[n].vtMoisPrec++
+      }
     })
+    const activeNames = new Set(
+      (activeCommerciaux || []).map(c => [c.prenom, c.nom].filter(Boolean).join(' '))
+    )
     const commerciaux = Object.entries(commMap)
-      .sort((a, b) => b[1].total - a[1].total).slice(0, 8)
-      .map(([name, d]) => ({ name, count: d.total, ca: d.ca, poses: d.poses,
+      .filter(([name]) => activeNames.has(name))
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([name, d]) => ({ name, count: d.total, ca: d.ca, poses: d.poses, vtCeMois: d.vtCeMois,
         conv: d.total > 0 ? Math.round((d.poses / d.total) * 100) : 0 }))
+    const activeCommEntries = Object.entries(commMap).filter(([name]) => activeNames.has(name))
+    const vtTotalMois     = activeCommEntries.reduce((s, [, d]) => s + d.vtCeMois, 0)
+    const vtTotalMoisPrec = activeCommEntries.reduce((s, [, d]) => s + d.vtMoisPrec, 0)
+    const vtEvolution = vtTotalMoisPrec > 0
+      ? ((vtTotalMois - vtTotalMoisPrec) / vtTotalMoisPrec) * 100
+      : (vtTotalMois > 0 ? 100 : 0)
 
     // Type contact
     const contactMap = {}
@@ -216,9 +241,11 @@ function useDashboardData(loggedInName, role) {
       .filter(r => !r.dateReellePose)
       .slice(0, 5)
 
+    const monthLabel = now.toLocaleDateString('fr-FR', { month: 'long' })
+
     return {
       totalDossiers, posesDone, tauxPoses, totalCA, totalKWc,
-      pipeline, monthly, commerciaux, contacts,
+      pipeline, monthly, commerciaux, contacts, monthLabel, vtTotalMois, vtEvolution,
       miniRows,
       awaitingVT: awaitingVTList.length, awaitingVTList: awaitingVTList.slice(0,8),
       vtThisWeek: vtThisWeek.length,
@@ -231,11 +258,57 @@ function useDashboardData(loggedInName, role) {
       totalResteEncaisser, dossiersAvecFin, dossiersAttenteAdmin, caEnCours,
       daily,
     }
-  }, [sheets, loggedInName, role])
+  }, [sheets, loggedInName, role, activeCommerciaux])
 }
 
 // ── Charts ───────────────────────────────────────────────────
-function LineChart({ data }) {
+// Courbe lissée monotone (Fritsch-Carlson) : passe par tous les points
+// sans dépassement (pas de creux sous 0 ni de pics au-dessus du max).
+function smoothPath(pts) {
+  const n = pts.length
+  if (n < 2) return `M${pts[0]?.x ?? 0},${pts[0]?.y ?? 0}`
+
+  const dx = [], dy = [], m = []
+  for (let i = 0; i < n - 1; i++) {
+    dx[i] = pts[i + 1].x - pts[i].x
+    dy[i] = pts[i + 1].y - pts[i].y
+    m[i]  = dy[i] / dx[i]
+  }
+
+  const t = new Array(n)
+  t[0]   = m[0]
+  t[n-1] = m[n-2]
+  for (let i = 1; i < n - 1; i++) {
+    t[i] = (m[i-1] * m[i] <= 0) ? 0 : (m[i-1] + m[i]) / 2
+  }
+  for (let i = 0; i < n - 1; i++) {
+    if (m[i] === 0) {
+      t[i] = 0
+      t[i+1] = 0
+    } else {
+      const a = t[i] / m[i]
+      const b = t[i+1] / m[i]
+      const s = a*a + b*b
+      if (s > 9) {
+        const tau = 3 / Math.sqrt(s)
+        t[i]   = tau * a * m[i]
+        t[i+1] = tau * b * m[i]
+      }
+    }
+  }
+
+  let d = `M${pts[0].x},${pts[0].y}`
+  for (let i = 0; i < n - 1; i++) {
+    const cp1x = pts[i].x + dx[i] / 3
+    const cp1y = pts[i].y + t[i] * dx[i] / 3
+    const cp2x = pts[i+1].x - dx[i] / 3
+    const cp2y = pts[i+1].y - t[i+1] * dx[i] / 3
+    d += ` C${cp1x},${cp1y} ${cp2x},${cp2y} ${pts[i+1].x},${pts[i+1].y}`
+  }
+  return d
+}
+
+function LineChart({ data, smooth=false }) {
   const max = Math.max(...data.map(d => d.count), 1)
   const W=600, H=200, PAD={top:20,right:12,bottom:0,left:8}
   const pts = data.map((d,i) => ({
@@ -243,7 +316,9 @@ function LineChart({ data }) {
     y: PAD.top + (1-d.count/max)*(H-PAD.top-PAD.bottom),
     count: d.count, label: d.label,
   }))
-  const pathD = pts.map((p,i)=>`${i===0?'M':'L'}${p.x},${p.y}`).join(' ')
+  const pathD = smooth
+    ? smoothPath(pts)
+    : pts.map((p,i)=>`${i===0?'M':'L'}${p.x},${p.y}`).join(' ')
   const areaD = `${pathD} L${pts[pts.length-1].x},${H-PAD.bottom} L${pts[0].x},${H-PAD.bottom} Z`
   return (
     <div className="dash-line-wrap">
@@ -263,10 +338,10 @@ function LineChart({ data }) {
   )
 }
 
-function BarChart({ data, color='#f97316' }) {
+function BarChart({ data, color='#f97316', thin=false }) {
   const max = Math.max(...data.map(d=>d.count),1)
   return (
-    <div className="dash-bar-chart">
+    <div className={`dash-bar-chart${thin ? ' dash-bar-chart--thin' : ''}`}>
       {data.map((d,i) => (
         <div key={i} className="dash-bar-col">
           <div className="dash-bar-track">
@@ -447,8 +522,26 @@ export default function Dashboard({ onNavigate }) {
   const role         = userProfile?.role || ''
   const loggedInName = [userProfile?.prenom, userProfile?.nom].filter(Boolean).join(' ')
 
-  const data = useDashboardData(loggedInName, role)
+  const [activeCommerciaux, setActiveCommerciaux] = useState([])
+  useEffect(() => {
+    supabaseGet('profiles', { role: 'eq.commercial', select: 'nom,prenom' })
+      .then(data => setActiveCommerciaux(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [])
+
+  // Pagination du graphique "Dossiers ouverts par jour" (tranches de 14 jours)
+  const DAILY_PAGE = 14
+  const [dailyOffset, setDailyOffset] = useState(0)
+
+  const data = useDashboardData(loggedInName, role, activeCommerciaux)
   const { stats: emailStats, loading: emailLoading, refresh: emailRefresh, refreshing } = useEmailStats()
+
+  // Fenêtre de 14 jours affichée dans "Dossiers ouverts par jour"
+  const dailyTotal     = data.daily.length
+  const dailyMaxOffset = Math.max(0, Math.ceil(dailyTotal / DAILY_PAGE) - 1)
+  const dailyEnd       = Math.max(0, dailyTotal - DAILY_PAGE * dailyOffset)
+  const dailyStart     = Math.max(0, dailyTotal - DAILY_PAGE * (dailyOffset + 1))
+  const dailyWindow    = data.daily.slice(dailyStart, dailyEnd)
 
   const isCommercial   = role === ROLES.COMMERCIAL
   const isTechnique    = role === ROLES.TECHNIQUE
@@ -479,7 +572,25 @@ export default function Dashboard({ onNavigate }) {
           </div>
           {data.commerciaux.length === 0
             ? <div className="dash-empty">Aucune donnée</div>
-            : <BarChart data={data.commerciaux.map(c => ({ label: c.name.split(' ')[0], count: c.count }))} />}
+            : (
+              <div className="dash-comm-perf">
+                <BarChart thin data={data.commerciaux.map(c => ({ label: c.name.split(' ')[0], count: c.count }))} />
+                <div className="dash-comm-vt-side">
+                  {data.vtEvolution > 0
+                    ? <TrendingUp size={20} className="dash-comm-vt-icon dash-comm-vt-icon--up" />
+                    : data.vtEvolution < 0
+                      ? <TrendingDown size={20} className="dash-comm-vt-icon dash-comm-vt-icon--down" />
+                      : <Minus size={20} className="dash-comm-vt-icon dash-comm-vt-icon--flat" />}
+                  <div className="dash-comm-vt-big">{data.vtTotalMois}</div>
+                  <div className="dash-comm-vt-title">VT en {data.monthLabel}</div>
+                  <div className={`dash-comm-vt-evol${
+                    data.vtEvolution > 0 ? ' dash-comm-vt-evol--up' : data.vtEvolution < 0 ? ' dash-comm-vt-evol--down' : ''
+                  }`}>
+                    {data.vtEvolution > 0 ? '+' : ''}{data.vtEvolution.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% vs mois dernier
+                  </div>
+                </div>
+              </div>
+            )}
         </div>
         <div className="dash-card">
           <div className="dash-card-header"><ClipboardList size={15} /><span>État des dossiers</span></div>
@@ -493,11 +604,32 @@ export default function Dashboard({ onNavigate }) {
       <div className="dash-charts-row">
         <div className="dash-card dash-card--wide">
           <div className="dash-card-header">
-            <Activity size={15} /><span>Dossiers ouverts par jour</span><span className="dash-card-sub">30 derniers jours</span>
+            <Activity size={15} /><span>Dossiers ouverts par jour</span>
+            <span className="dash-card-sub">
+              {dailyWindow[0]?.label} – {dailyWindow[dailyWindow.length - 1]?.label}
+            </span>
+            <div className="dash-daily-nav">
+              <button
+                className="dash-daily-arrow"
+                onClick={() => setDailyOffset(o => Math.min(dailyMaxOffset, o + 1))}
+                disabled={dailyOffset >= dailyMaxOffset}
+                aria-label="Période précédente"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                className="dash-daily-arrow"
+                onClick={() => setDailyOffset(o => Math.max(0, o - 1))}
+                disabled={dailyOffset <= 0}
+                aria-label="Période suivante"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
-          {data.daily.every(d => d.count === 0)
-            ? <div className="dash-empty">Aucun dossier sur les 30 derniers jours</div>
-            : <LineChart data={data.daily} />}
+          {dailyWindow.every(d => d.count === 0)
+            ? <div className="dash-empty">Aucun dossier sur cette période</div>
+            : <LineChart data={dailyWindow} smooth />}
         </div>
         <div className="dash-card">
           <div className="dash-card-header"><Calendar size={15} /><span>Prochaines poses</span></div>

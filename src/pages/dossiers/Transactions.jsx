@@ -137,13 +137,45 @@ function useTransactions() {
   }, [sheets])
 }
 
+// ── Commercial cell (éditable via dropdown) ──────────────────
+function CommercialCell({ row, commerciaux }) {
+  const { setCellValue } = useSpreadsheet()
+
+  if (row.cancelled) return row.commercial || <span className="dossier-empty-cell">--</span>
+
+  const [prefix, rowStr] = row.id.split(':')
+  const sheetId = prefix === 'c' ? 'btoc-comptant' : prefix === 'a' ? 'btoc-abonnement' : 'btob'
+  const rowNum  = parseInt(rowStr)
+  const letter  = getColumnIdToLetterMap(sheetId)['COMMERCIAL']
+
+  return (
+    <select
+      className="tx-commercial-select"
+      value={row.commercial}
+      onClick={e => e.stopPropagation()}
+      onChange={e => {
+        if (letter) setCellValue(sheetId, `${letter}${rowNum}`, e.target.value)
+      }}
+    >
+      <option value="">— Sélectionner —</option>
+      {row.commercial && !commerciaux.some(c => [c.prenom, c.nom].filter(Boolean).join(' ') === row.commercial) && (
+        <option value={row.commercial}>{row.commercial}</option>
+      )}
+      {commerciaux.map(c => {
+        const fullName = [c.prenom, c.nom].filter(Boolean).join(' ')
+        return <option key={c.id} value={fullName}>{fullName}</option>
+      })}
+    </select>
+  )
+}
+
 // ── Columns ───────────────────────────────────────────────────
-function makeColumns() {
+function makeColumns(commerciaux) {
   return [
     { key: 'nom',             label: 'Nom de la transaction', width: 240, render: v => <span className="dossier-td--name">{v}</span> },
     { key: 'dateDdeVT',       label: 'Date demande VT',       width: 140, hideOnMobile: true },
     { key: 'dateCloture',     label: 'Date de fermeture',     width: 150, hideOnMobile: true },
-    { key: 'commercial',      label: 'Commercial',            width: 150, hideOnMobile: true },
+    { key: 'commercial',      label: 'Commercial',            width: 150, hideOnMobile: true, render: (v, row) => <CommercialCell row={row} commerciaux={commerciaux} /> },
     { key: 'chargesAffaires', label: "Chargé d'affaires",    width: 160, hideOnMobile: true },
     { key: 'phaseSlot',       label: 'Étape',                 width: 180, render: v => <PhaseBadge slot={v} /> },
     { key: 'type',            label: 'Type',                  width: 130, render: (v, row) => <DossierBadge label={v} colorKey={row.typeKey} /> },
@@ -238,7 +270,7 @@ export function AddTransactionPanel({ onClose, onCreated, lockedContact = null }
   const [error, setError]     = useState(null)
 
   useEffect(() => {
-    supabaseGet('commerciaux', { select: 'id,nom,prenom', order: 'nom.asc' })
+    supabaseGet('profiles', { role: 'eq.commercial', select: 'id,nom,prenom', order: 'nom.asc' })
       .then(data => setCommerciaux(data || []))
   }, [])
 
@@ -728,8 +760,15 @@ function exportToPDF(rows, pipelineName) {
 // ── Main ──────────────────────────────────────────────────────
 export default function Transactions() {
   const rows    = useTransactions()
-  const COLUMNS = useMemo(() => makeColumns(), [])
   const { clearContactRow } = useSpreadsheet()
+
+  const [commerciaux, setCommerciaux] = useState([])
+  useEffect(() => {
+    supabaseGet('profiles', { role: 'eq.commercial', select: 'id,nom,prenom', order: 'nom.asc' })
+      .then(data => setCommerciaux(data || []))
+  }, [])
+
+  const COLUMNS = useMemo(() => makeColumns(commerciaux), [commerciaux])
 
   const [showSettings,          setShowSettings]          = useState(false)
   const [showAdd,               setShowAdd]               = useState(false)
