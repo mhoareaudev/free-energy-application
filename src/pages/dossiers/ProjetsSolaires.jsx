@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Sun } from 'lucide-react'
 import { useSpreadsheet } from '../../context/SpreadsheetContext'
 import { getColumnIdToLetterMap } from '../../data/sheetsConfig'
+import { formatDateDisplay } from '../../utils/dateUtils'
 import DossierListPage, { DossierBadge } from './DossierListPage'
 
 function extractRows(cells, commercialLetter) {
@@ -36,16 +37,6 @@ function computePhase(cells, colMap, row, sheetId) {
   return                           { label: 'Lead entrant', key: 'lead' }
 }
 
-function formatDate(raw) {
-  if (!raw) return ''
-  if (raw.includes('/')) return raw
-  try {
-    const d = new Date(raw)
-    if (!isNaN(d)) return d.toLocaleDateString('fr-FR')
-  } catch { /* ignore */ }
-  return raw
-}
-
 function formatMontant(raw) {
   if (!raw) return ''
   const n = parseFloat(String(raw).replace(/[^\d.-]/g, ''))
@@ -70,7 +61,7 @@ function useProjetsSolaires() {
         nom,
         phase: phase.label, phaseKey: phase.key,
         commercial:  cellsC[`${colC['COMMERCIAL']}${r}`]  || '',
-        dateCloture: formatDate(cellsC[`${colC['SIGNE_LE']}${r}`] || ''),
+        dateCloture: formatDateDisplay(cellsC[`${colC['SIGNE_LE']}${r}`] || ''),
         montant:     formatMontant(cellsC[`${colC['TOTAL_TTC']}${r}`] || ''),
       })
     })
@@ -87,7 +78,7 @@ function useProjetsSolaires() {
         nom,
         phase: phase.label, phaseKey: phase.key,
         commercial:  cellsA[`${colA['COMMERCIAL']}${r}`]  || '',
-        dateCloture: formatDate(cellsA[`${colA['SIGNE_LE']}${r}`] || ''),
+        dateCloture: formatDateDisplay(cellsA[`${colA['SIGNE_LE']}${r}`] || ''),
         montant:     formatMontant(cellsA[`${colA['MONTANT_TTC_VENTE']}${r}`] || ''),
       })
     })
@@ -104,7 +95,7 @@ function useProjetsSolaires() {
         nom,
         phase: phase.label, phaseKey: phase.key,
         commercial:  cellsB[`${colB['COMMERCIAL']}${r}`]  || '',
-        dateCloture: formatDate(cellsB[`${colB['SIGNE_LE']}${r}`] || ''),
+        dateCloture: formatDateDisplay(cellsB[`${colB['SIGNE_LE']}${r}`] || ''),
         montant:     formatMontant(cellsB[`${colB['TOTAL_TTC']}${r}`] || ''),
       })
     })

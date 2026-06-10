@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Building2 } from 'lucide-react'
 import { useSpreadsheet } from '../../context/SpreadsheetContext'
 import { getColumnIdToLetterMap } from '../../data/sheetsConfig'
+import { formatDateDisplay } from '../../utils/dateUtils'
 import DossierListPage from './DossierListPage'
 
 function extractRows(cells, commercialLetter) {
@@ -12,16 +13,6 @@ function extractRows(cells, commercialLetter) {
     if (m && parseInt(m[1]) >= 2) rowSet.add(parseInt(m[1]))
   })
   return Array.from(rowSet).filter(r => cells[`${commercialLetter}${r}`])
-}
-
-function formatDate(raw) {
-  if (!raw) return ''
-  if (raw.includes('/')) return raw
-  try {
-    const d = new Date(raw)
-    if (!isNaN(d)) return d.toLocaleDateString('fr-FR')
-  } catch { /* ignore */ }
-  return raw
 }
 
 function useEntreprises() {
@@ -39,7 +30,7 @@ function useEntreprises() {
         nom,
         commercial:  cellsB[`${colB['COMMERCIAL']}${r}`]         || '',
         telephone:   cellsB[`${colB['TELEPHONE']}${r}`]           || '',
-        signeLe:     formatDate(cellsB[`${colB['SIGNE_LE']}${r}`] || ''),
+        signeLe:     formatDateDisplay(cellsB[`${colB['SIGNE_LE']}${r}`] || ''),
         ville:       cellsB[`${colB['VILLE']}${r}`]               || '',
         adresse:     cellsB[`${colB['ADRESSE_INSTALLATION']}${r}`]|| '',
       })

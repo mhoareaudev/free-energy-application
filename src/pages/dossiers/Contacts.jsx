@@ -510,7 +510,11 @@ export default function Contacts() {
     [rawRows, metadata, newIlioRows]
   )
   const [showAdd,             setShowAdd]             = useState(false)
-  const [activeContactId,     setActiveContactId]     = useState(null)
+  const [activeContactId,     setActiveContactId]     = useState(() => {
+    const pending = sessionStorage.getItem('pendingContactId')
+    if (pending) { sessionStorage.removeItem('pendingContactId'); return pending }
+    return null
+  })
   const [activeTransactionId, setActiveTransactionId] = useState(null)
   const [activeIlioContact,   setActiveIlioContact]   = useState(null)
   const [toast,               setToast]               = useState(null)

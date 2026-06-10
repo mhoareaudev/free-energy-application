@@ -4,6 +4,7 @@ import { FileText, Filter, MoreVertical } from 'lucide-react'
 import { useSpreadsheet } from '../context/SpreadsheetContext'
 import { useAuth } from '../context/AuthContext'
 import { getSheetColumns, getColumnIdToLetterMap } from '../data/sheetsConfig'
+import { formatDateDisplay } from '../utils/dateUtils'
 import { supabaseGet } from '../lib/supabase'
 import ContextMenu from './ContextMenu'
 import HeaderContextMenu from './HeaderContextMenu'
@@ -14,6 +15,12 @@ import './Spreadsheet.css'
 
 const TOTAL_ROWS = 999
 const VISIBLE_BUFFER = 10
+const DATE_COL_RE = /^DATE_|_LE$/
+const EXTRA_DATE_COLS = new Set(['DEMANDE_DP'])
+
+function isDateColumn(colId) {
+  return DATE_COL_RE.test(colId) || EXTRA_DATE_COLS.has(colId)
+}
 const ROW_HEIGHT = 28
 const ROW_NUMBER_WIDTH = 40
 const ACTION_COL_WIDTH = 56
@@ -1163,7 +1170,7 @@ export default function Spreadsheet() {
                     />
                   ) : (
                     <div className="cell-content" style={{ ...style, textAlign: col.align || undefined }}>
-                      {value}
+                      {isDateColumn(col.id) ? formatDateDisplay(value) : value}
                     </div>
                   )}
                 </div>
@@ -1226,7 +1233,7 @@ export default function Spreadsheet() {
                     />
                   ) : (
                     <div className="cell-content" style={{ ...style, textAlign: col.align || undefined }}>
-                      {value}
+                      {isDateColumn(col.id) ? formatDateDisplay(value) : value}
                     </div>
                   )}
                 </div>

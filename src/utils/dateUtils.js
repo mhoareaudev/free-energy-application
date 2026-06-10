@@ -34,6 +34,27 @@ export function isoToDMY(isoDate) {
 }
 
 /**
+ * Normalize any date string to DD/MM/YYYY for display.
+ * Handles DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD and YYYY/MM/DD (e.g. dates
+ * imported from other tools), in addition to anything Date can parse.
+ */
+export function formatDateDisplay(raw) {
+  if (!raw) return ''
+  const str = String(raw).trim()
+  const sep = str.includes('/') ? '/' : str.includes('-') ? '-' : null
+  if (sep) {
+    const parts = str.split(sep)
+    if (parts.length === 3) {
+      const [a, b, c] = parts
+      if (a.length === 4) return `${c.padStart(2, '0')}/${b.padStart(2, '0')}/${a}`
+      if (c.length === 4) return `${a.padStart(2, '0')}/${b.padStart(2, '0')}/${c}`
+    }
+  }
+  const d = new Date(str)
+  return isNaN(d) ? str : d.toLocaleDateString('fr-FR')
+}
+
+/**
  * Add n days to a DD/MM/YYYY date string and return DD/MM/YYYY.
  */
 export function addDaysToFR(ddmmyyyy, n) {

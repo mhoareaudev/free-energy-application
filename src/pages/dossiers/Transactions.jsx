@@ -13,7 +13,7 @@ import { supabaseGet, supabasePost, supabaseUpsert, supabaseDelete } from '../..
 import { sendVTRequestEmail } from '../../utils/sendVTEmail'
 import { useAuth } from '../../context/AuthContext'
 import { useNotifications } from '../../context/NotificationContext'
-import { formatDateFR } from '../../utils/dateUtils'
+import { formatDateFR, formatDateDisplay } from '../../utils/dateUtils'
 import TransactionDetail from './TransactionDetail'
 import ImportPreviewModal from '../../components/ImportPreviewModal'
 import './Transactions.css'
@@ -61,13 +61,6 @@ function getEtatDossier(cells, colMap, row) {
   return letter ? (cells[`${letter}${row}`] || 'Demande de VT') : 'Demande de VT'
 }
 
-function formatDate(raw) {
-  if (!raw) return ''
-  if (raw.includes('/')) return raw
-  try { const d = new Date(raw); if (!isNaN(d)) return d.toLocaleDateString('fr-FR') } catch { /* ignore */ }
-  return raw
-}
-
 function formatMontant(raw) {
   if (!raw) return ''
   const n = parseFloat(String(raw).replace(/[^\d.-]/g, ''))
@@ -92,10 +85,10 @@ function useTransactions() {
         id: `c:${r}`, nom,
         phaseSlot:   cancelled ? '__cancelled' : getEtatDossier(cellsC, colC, r),
         commercial:  cellsC[`${colC['COMMERCIAL']}${r}`]  || '',
-        dateCloture: cancelled ? cancelled.date : formatDate(cellsC[`${colC['SIGNE_LE']}${r}`] || ''),
+        dateCloture: cancelled ? cancelled.date : formatDateDisplay(cellsC[`${colC['SIGNE_LE']}${r}`] || ''),
         montant:          cancelled ? '—' : formatMontant(cellsC[`${colC['TOTAL_TTC']}${r}`] || ''),
         chargesAffaires:  cellsC[`${colC['CHARGES_AFFAIRES']}${r}`] || '',
-        dateDdeVT:        formatDate(cellsC[`${colC['DATE_DDE_VT']}${r}`] || ''),
+        dateDdeVT:        formatDateDisplay(cellsC[`${colC['DATE_DDE_VT']}${r}`] || ''),
         type: 'Comptant', typeKey: 'comptant', cancelled,
       })
     })
@@ -109,10 +102,10 @@ function useTransactions() {
         id: `a:${r}`, nom,
         phaseSlot:   cancelled ? '__cancelled' : getEtatDossier(cellsA, colA, r),
         commercial:  cellsA[`${colA['COMMERCIAL']}${r}`]  || '',
-        dateCloture: cancelled ? cancelled.date : formatDate(cellsA[`${colA['SIGNE_LE']}${r}`] || ''),
+        dateCloture: cancelled ? cancelled.date : formatDateDisplay(cellsA[`${colA['SIGNE_LE']}${r}`] || ''),
         montant:         cancelled ? '—' : formatMontant(cellsA[`${colA['MONTANT_TTC_VENTE']}${r}`] || ''),
         chargesAffaires: cellsA[`${colA['CHARGES_AFFAIRES']}${r}`] || '',
-        dateDdeVT:       formatDate(cellsA[`${colA['DATE_DDE_VT']}${r}`] || ''),
+        dateDdeVT:       formatDateDisplay(cellsA[`${colA['DATE_DDE_VT']}${r}`] || ''),
         type: 'Abonnement', typeKey: 'abonnement', cancelled,
       })
     })
@@ -126,10 +119,10 @@ function useTransactions() {
         id: `b:${r}`, nom,
         phaseSlot:   cancelled ? '__cancelled' : getEtatDossier(cellsB, colB, r),
         commercial:  cellsB[`${colB['COMMERCIAL']}${r}`]  || '',
-        dateCloture: cancelled ? cancelled.date : formatDate(cellsB[`${colB['SIGNE_LE']}${r}`] || ''),
+        dateCloture: cancelled ? cancelled.date : formatDateDisplay(cellsB[`${colB['SIGNE_LE']}${r}`] || ''),
         montant:         cancelled ? '—' : formatMontant(cellsB[`${colB['TOTAL_TTC']}${r}`] || ''),
         chargesAffaires: cellsB[`${colB['CHARGES_AFFAIRES']}${r}`] || '',
-        dateDdeVT:       formatDate(cellsB[`${colB['DATE_DDE_VT']}${r}`] || ''),
+        dateDdeVT:       formatDateDisplay(cellsB[`${colB['DATE_DDE_VT']}${r}`] || ''),
         type: 'BtoB', typeKey: 'btob', cancelled,
       })
     })

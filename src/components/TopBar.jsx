@@ -1,15 +1,19 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatDateFR } from '../utils/dateUtils'
 import {
   Search, Phone, MessageSquare, HelpCircle, Settings,
   Bell, CheckCheck, X, Trash2, ClipboardList, BellOff,
   Sparkles, ChevronDown, User, Lock, Eye, EyeOff, CheckCircle2,
+  Users, Building2, Zap,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNotifications } from '../context/NotificationContext'
+import { useGlobalSearchIndex } from '../hooks/useGlobalSearch'
 import { supabase } from '../lib/supabase'
 import './TopBar.css'
+
+const SEARCH_RESULT_LIMIT = 5
 
 function ProfileModal({ user, userProfile, onClose }) {
   const [tab, setTab]           = useState('profil')
@@ -143,16 +147,56 @@ export default function TopBar({ onOpenAssistant, onNavigate }) {
   } = useNotifications()
 
   const [searchQuery, setSearchQuery]       = useState('')
+  const [showSearchResults, setShowSearchResults] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu]     = useState(false)
 
   const notifRef   = useRef(null)
   const userMenuRef = useRef(null)
+  const searchRef  = useRef(null)
+
+  const { contacts, entreprises, dossiers } = useGlobalSearchIndex()
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return null
+    const match = list => list.filter(r => r.nom.toLowerCase().includes(q)).slice(0, SEARCH_RESULT_LIMIT)
+    return {
+      contacts:    match(contacts),
+      entreprises: match(entreprises),
+      dossiers:    match(dossiers),
+    }
+  }, [searchQuery, contacts, entreprises, dossiers])
+
+  const hasSearchResults = !!searchResults && (
+    searchResults.contacts.length || searchResults.entreprises.length || searchResults.dossiers.length
+  )
+
+  const goToContact = (id) => {
+    sessionStorage.setItem('pendingContactId', id)
+    onNavigate?.('contacts')
+    setSearchQuery('')
+    setShowSearchResults(false)
+  }
+
+  const goToDossier = (id) => {
+    sessionStorage.setItem('pendingTxId', id)
+    onNavigate?.('transactions')
+    setSearchQuery('')
+    setShowSearchResults(false)
+  }
+
+  const goToEntreprise = () => {
+    onNavigate?.('entreprises')
+    setSearchQuery('')
+    setShowSearchResults(false)
+  }
 
   useEffect(() => {
     const handle = (e) => {
       if (notifRef.current && !notifRef.current.contains(e.target))  setShowNotifications(false)
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setShowUserMenu(false)
+      if (searchRef.current && !searchRef.current.contains(e.target)) setShowSearchResults(false)
     }
     document.addEventListener('mousedown', handle)
     return () => document.removeEventListener('mousedown', handle)
@@ -190,15 +234,64 @@ export default function TopBar({ onOpenAssistant, onNavigate }) {
       <img src="/logo.png" alt="FE" className="topbar-logo-mob" />
 
       {/* ── Search ── */}
-      <div className="topbar-search">
+      <div className="topbar-search" ref={searchRef}>
         <Search size={14} className="topbar-search-icon" />
         <input
           type="text"
           className="topbar-search-input"
           placeholder="Rechercher un dossier, client..."
           value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
+          onChange={e => { setSearchQuery(e.target.value); setShowSearchResults(true) }}
+          onFocus={() => setShowSearchResults(true)}
+          onKeyDown={e => { if (e.key === 'Escape') setShowSearchResults(false) }}
         />
+
+        {showSearchResults && searchQuery.trim() && (
+          <div className="topbar-search-results">
+            {!hasSearchResults ? (
+              <div className="topbar-search-empty">Aucun résultat pour « {searchQuery.trim()} »</div>
+            ) : (
+              <>
+                {searchResults.contacts.length > 0 && (
+                  <div className="topbar-search-group">
+                    <div className="topbar-search-group-label">Contacts</div>
+                    {searchResults.contacts.map(r => (
+                      <button key={`c-${r.id}`} className="topbar-search-item" onClick={() => goToContact(r.id)}>
+                        <Users size={13} className="topbar-search-item-icon" />
+                        <span className="topbar-search-item-name">{r.nom}</span>
+                        {r.ville && <span className="topbar-search-item-sub">{r.ville}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {searchResults.entreprises.length > 0 && (
+                  <div className="topbar-search-group">
+                    <div className="topbar-search-group-label">Entreprises</div>
+                    {searchResults.entreprises.map(r => (
+                      <button key={`e-${r.id}`} className="topbar-search-item" onClick={goToEntreprise}>
+                        <Building2 size={13} className="topbar-search-item-icon" />
+                        <span className="topbar-search-item-name">{r.nom}</span>
+                        {r.sub && <span className="topbar-search-item-sub">{r.sub}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {searchResults.dossiers.length > 0 && (
+                  <div className="topbar-search-group">
+                    <div className="topbar-search-group-label">Dossiers</div>
+                    {searchResults.dossiers.map(r => (
+                      <button key={`d-${r.id}`} className="topbar-search-item" onClick={() => goToDossier(r.id)}>
+                        <Zap size={13} className="topbar-search-item-icon" />
+                        <span className="topbar-search-item-name">{r.nom}</span>
+                        {r.sub && <span className="topbar-search-item-sub">{r.sub}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Right actions ── */}
