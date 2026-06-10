@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   ArrowLeft, ChevronDown, FileText, Paperclip, CheckCircle2,
-  Trash2, AlertTriangle, X, Ban,
+  Trash2, AlertTriangle, X, Ban, RotateCcw,
 } from 'lucide-react'
 import { useSpreadsheet } from '../../context/SpreadsheetContext'
 import { useAuth } from '../../context/AuthContext'
@@ -1317,6 +1317,7 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
   const [showCancelModal,  setShowCancelModal]  = useState(false)
   const [deleting,         setDeleting]         = useState(false)
   const [cancelling,       setCancelling]       = useState(false)
+  const [restoring,        setRestoring]        = useState(false)
   const [deleted,          setDeleted]          = useState(false)
   const actMenuRef = useRef(null)
 
@@ -1455,6 +1456,26 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
     } catch {}
     setCancelling(false)
     setShowCancelModal(false)
+  }
+
+  const handleRestoreProject = async () => {
+    setRestoring(true)
+    const today = todayReunion()
+    const loggedInName = [userProfile?.prenom, userProfile?.nom].filter(Boolean).join(' ') || 'Inconnu'
+    setCellValue(sheetId, `__cancelled:${rowNum}`, '')
+    try {
+      await supabasePost('contact_activities', {
+        contact_id: transactionId,
+        type: 'restored',
+        title: `Projet réactivé — ${nom}`,
+        body: `Annulation annulée le ${today} par ${loggedInName}`,
+        created_by_name: loggedInName,
+      })
+      loadActivities()
+    } catch {}
+    setRestoring(false)
+    setActMenuOpen(false)
+    setToast('Le projet a été réactivé')
   }
 
   const sendCAAssignmentEmail = async (caFullName, caEmail) => {
@@ -1648,13 +1669,22 @@ export default function TransactionDetail({ transactionId, onBack, backLabel = '
           </button>
           {actMenuOpen && (
             <div className="cd-actions-menu">
-              {!cancelled && (
+              {!cancelled ? (
                 <button
                   className="cd-actions-menu-item cd-actions-menu-item--cancel"
                   onClick={() => { setActMenuOpen(false); setShowCancelModal(true) }}
                 >
                   <Ban size={13} />
                   Annuler le projet
+                </button>
+              ) : (
+                <button
+                  className="cd-actions-menu-item cd-actions-menu-item--restore"
+                  onClick={handleRestoreProject}
+                  disabled={restoring}
+                >
+                  <RotateCcw size={13} />
+                  {restoring ? 'Réactivation...' : 'Réactiver le projet'}
                 </button>
               )}
               <button

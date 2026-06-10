@@ -479,6 +479,15 @@
   color: #ea580c;
 }
 
+.cd-actions-menu-item--restore {
+  color: #16a34a;
+}
+
+.cd-actions-menu-item--restore:hover {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
 /* ── Stage action buttons ── */
 .td-stage-actions {
   display: flex;
